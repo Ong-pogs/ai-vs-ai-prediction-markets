@@ -78,10 +78,22 @@ export function likeForLike(state, rounds) {
       balanceCheck: cents(all.pnl - (c.account.cash + positions.filter(p => p.state === 'open').reduce((sum, p) => sum + p.shares * (p.mark ?? p.avgPrice), 0) - c.account.startingCash)),
     };
   });
+  // How often two AIs ended a round with exactly the same bets: the same games on the same sides.
+  const betsByRound = name => {
+    const by = new Map();
+    for (const p of state.contestants[name].account.positions) by.set(p.round, [...(by.get(p.round) || []), `${p.gameId}:${p.side}`].sort());
+    return by;
+  };
+  const sameBets = [];
+  for (let i = 0; i < ais.length; i++) for (let j = i + 1; j < ais.length; j++) {
+    const a = betsByRound(ais[i]), b = betsByRound(ais[j]);
+    const both = played.map(p => p.round).filter(n => a.has(n) && b.has(n));
+    sameBets.push({a: ais[i], b: ais[j], roundsBothBet: both.length, rounds: both.filter(n => a.get(n).join('|') === b.get(n).join('|'))});
+  }
   return {
     runId: state.runId, ais, roundsPlanned: state.rounds, roundsMissed: (state.missedRounds || []).length, roundsInProgress: inProgress,
     roundsWithoutGames: withoutGames, roundsPlayed: played.length, roundsAllAnswered: fair.size, likeForLikeRounds: [...fair],
-    notAnswered, contestants,
+    notAnswered, contestants, sameBets,
   };
 }
 
@@ -101,6 +113,8 @@ export function comparisonLines(result) {
     const sat = Object.entries(c.rounds).filter(([kind, n]) => kind !== 'answered' && n).map(([kind, n]) => `${n} ${kind}`).join(', ');
     lines.push(`${c.name.padEnd(10)} ${cell(c.all)}   ${cell(c.likeForLike)}${sat ? `   sat out: ${sat}` : ''}${c.baseline ? '   (not an AI)' : ''}`);
   }
+  lines.push('');
+  for (const pair of result.sameBets || []) lines.push(`same bets  ${pair.a} and ${pair.b} placed exactly the same bets in ${pair.rounds.length} of the ${pair.roundsBothBet} rounds in which both bet${pair.rounds.length ? ` (round${pair.rounds.length === 1 ? '' : 's'} ${pair.rounds.join(', ')})` : ''}`);
   const off = result.contestants.filter(c => Math.abs(c.balanceCheck) > 0.02);
   lines.push('', off.length ? `CHECK: the bets do not add up to the balance for ${off.map(c => `${c.name} (${signed(c.balanceCheck)})`).join(', ')}` : 'check: for every contestant the profit over every bet equals balance minus starting cash');
   return lines;

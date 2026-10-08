@@ -99,6 +99,24 @@ test('the comparison is given over every round and over only the rounds in which
   assert.deepEqual(result.notAnswered.map(m => [m.round, m.name, m.kind, m.cause]), [[2, 'jev', 'late', null], [3, 'claude', 'unavailable', 'plan limit']]);
 });
 
+test('rounds in which two AIs placed exactly the same bets are counted', () => {
+  const holds = (name, bets) => ({name, label: name, account: account(bets.map(([round, gameId, side]) => bet(round, 'open', 5, {gameId, side})))});
+  const twins = {
+    runId: 'twins', rounds: 3, missedRounds: [],
+    contestants: {
+      claude: holds('claude', [[1, 'fx_a', 'YES'], [1, 'fx_b', 'NO'], [2, 'fx_c', 'YES'], [2, 'fx_d', 'YES'], [3, 'fx_e', 'NO']]),
+      gpt6: holds('gpt6', [[1, 'fx_b', 'NO'], [1, 'fx_a', 'YES'], [2, 'fx_c', 'YES'], [2, 'fx_d', 'NO'], [3, 'fx_e', 'NO']]),
+      jev: holds('jev', [[1, 'fx_a', 'YES'], [1, 'fx_z', 'NO'], [3, 'fx_e', 'YES']]),
+    },
+  };
+  const all = {claude: ok(1), gpt6: ok(1), jev: ok(1)};
+  const result = likeForLike(twins, [1, 2, 3].map(round => ({round, finishedAt: 't', slate, answers: all})));
+  const pair = (a, b) => result.sameBets.find(p => p.a === a && p.b === b);
+  assert.deepEqual(pair('claude', 'gpt6'), {a: 'claude', b: 'gpt6', roundsBothBet: 3, rounds: [1, 3]}, 'the order the bets were placed in does not matter; the side does');
+  assert.deepEqual(pair('claude', 'jev'), {a: 'claude', b: 'jev', roundsBothBet: 2, rounds: []});
+  assert.match(comparisonLines(result).join('\n'), /claude and gpt6 placed exactly the same bets in 2 of the 3 rounds in which both bet \(rounds 1, 3\)/);
+});
+
 test('an open bet is worth its last price, and its fill price until one is read', () => {
   assert.equal(betValue(bet(1, 'open', 5, {mark: 0.6})), 1);
   assert.equal(betValue(bet(1, 'open', 5)), 0);
