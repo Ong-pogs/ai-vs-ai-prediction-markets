@@ -6,10 +6,12 @@
 //   node src/cli.mjs settle     settle a stopped or finished run again from the markets' resolutions
 //   node src/cli.mjs dashboard  serve the dashboard for a run without running it
 //   node src/cli.mjs check      ask every contestant one sample question and show what comes back
+//   node src/cli.mjs compare    the result over every round, and over only the rounds in which every AI answered (--save, --json)
 // Options: --config <file>  --run-id <id>  --new  --start-at <HH:MM>  --rounds <n>  --interval-min <m>  --settle-grace-hours <h>  --port <p>  --no-dashboard
 import {spawn} from 'node:child_process';
 import {existsSync, openSync, readFileSync, rmSync, writeFileSync} from 'node:fs';
 import {fileURLToPath} from 'node:url';
+import {join} from 'node:path';
 import {loadConfig, DEFAULT_CONFIG, RUNS, REPO} from './config.mjs';
 import {readEnvFile, requireKey} from './env.mjs';
 import {makePredictefy} from './predictefy.mjs';
@@ -20,6 +22,7 @@ import {createState, newRunId, runLoop, settlePass, finishedSummary, roundTime} 
 import {startServer} from './server.mjs';
 import {buildPrompt} from './prompt.mjs';
 import {summary} from './ledger.mjs';
+import {likeForLike, comparisonLines} from './compare.mjs';
 import {iso, sleep, writeJsonAtomic} from './util.mjs';
 
 function parseArgs(argv) {
@@ -153,6 +156,19 @@ function status(args) {
   if (state.lastError) console.log(`last error ${state.lastError.at}: ${state.lastError.message.split('\n')[0]}`);
 }
 
+/** Reads the saved run and changes nothing in it, so it is safe on a run that is still going. --save writes the result beside the run. */
+function compare(args) {
+  const store = pickStore(args), state = store.load();
+  const result = likeForLike(state, store.roundNumbers().map(n => store.loadRound(n)).filter(Boolean));
+  if (args.json) console.log(JSON.stringify(result, null, 2));
+  else for (const line of comparisonLines(result)) console.log(line);
+  if (args.save) {
+    const file = join(store.dir, 'like-for-like.json');
+    writeJsonAtomic(file, {writtenAt: iso(), ...result});
+    if (!args.json) console.log(`saved      ${file}`);
+  }
+}
+
 function stop(args) {
   const store = pickStore(args);
   store.requestStop();
@@ -202,7 +218,7 @@ async function check(args) {
   }
 }
 
-const commands = {start, launch, status, stop, settle, dashboard, check};
+const commands = {start, launch, status, stop, settle, dashboard, check, compare};
 const [name = 'start', ...rest] = process.argv.slice(2);
 const command = commands[name];
 if (!command) { console.error(`Unknown command "${name}". Use one of: ${Object.keys(commands).join(', ')}`); process.exit(1); }

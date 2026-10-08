@@ -65,7 +65,9 @@ export function loadConfig(file = DEFAULT_CONFIG, overrides = {}) {
     facts: {...DEFAULTS.facts, ...given.facts, ...overrides.facts},
   };
   config.contestants = (given.contestants || []).map(c => ({...c, ...(local.contestants?.[c.name] || {})}));
-  config.envFile = isAbsolute(config.envFile) ? config.envFile : join(REPO, config.envFile);
+  // ARENA_ENV_FILE points at a keys file kept somewhere else, so a fresh clone can run without its own copy of the keys.
+  const envFile = process.env.ARENA_ENV_FILE || config.envFile;
+  config.envFile = isAbsolute(envFile) ? envFile : join(REPO, envFile);
   const problems = validateConfig(config);
   if (problems.length) throw new Error(`The config ${path} has problems:\n- ${problems.join('\n- ')}`);
   config.intervalSec = Math.round(config.intervalMinutes * 60);

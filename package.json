@@ -5,7 +5,9 @@
   "type": "module",
   "private": true,
   "license": "MIT",
-  "engines": { "node": ">=22.12" },
+  "engines": {
+    "node": ">=22.12"
+  },
   "scripts": {
     "start": "node src/cli.mjs start",
     "launch": "node src/cli.mjs launch",
@@ -14,6 +16,19 @@
     "settle": "node src/cli.mjs settle",
     "check": "node src/cli.mjs check",
     "dashboard": "node src/cli.mjs dashboard",
+    "compare": "node src/cli.mjs compare",
     "test": "node --test \"test/*.test.mjs\""
-  }
+  },
+  "keywords": [
+    "polymarket",
+    "kalshi",
+    "prediction-markets",
+    "paper-trading",
+    "ai-trading-bot",
+    "claude",
+    "gpt",
+    "llm-benchmark",
+    "predictefy",
+    "sports-betting"
+  ]
 }

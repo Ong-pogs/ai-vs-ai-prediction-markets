@@ -212,10 +212,80 @@ const short = label => label.split(' ')[0];
 const VENUE = {polymarket: 'Polymarket', kalshi: 'Kalshi'};
 const GREY = '#8f8e88', FALLBACK = ['#3987e5', '#d95926', '#199e70', '#c98500', '#d55181', '#008300', '#9085e9', '#e66767'];
 
-const ui = {view: null, tab: 'round', round: null, focus: null, order: [], roundCache: new Map(), fetchedAt: 0};
+const ui = {view: null, tab: 'round', round: null, focus: null, order: [], roundCache: new Map(), played: new Map(), fetchedAt: 0};
 const colorOf = c => c.baseline ? GREY : (c.color || FALLBACK[ui.order.indexOf(c.name) % FALLBACK.length]);
 const openOf = c => c.account.positions.filter(p => p.state === 'open');
 const equityOf = c => c.account.cash + openOf(c).reduce((sum, p) => sum + p.shares * (p.mark ?? p.avgPrice), 0);
+
+// ---------- when an AI could not answer ----------
+// A call that fails because a plan limit was reached, the service was down or a login had expired is not the AI's
+// doing. The list of causes is the same as in src/compare.mjs; a test checks that the two stay identical.
+/* causes:start */
+const CAUSES = [
+  ['plan limit', /usage limit|session limit|weekly limit|hit your [a-z0-9 -]{0,24}limit|limit reached|limit will reset|rate.?limit|too many requests|\b429\b|quota|out of [a-z ]{0,20}(credit|usage)|credit balance|insufficient[a-z ]{0,14}(credit|quota|funds|balance)|\b402\b|payment required|billing/i],
+  ['not signed in', /not signed in|login has expired|sign(ed)? in again|log ?in again|please run \/login|unauthori[sz]ed|\b401\b|\b403\b|oauth|invalid api key|rejected the api key|refresh token|missing from the env file/i],
+  ['service error', /overloaded|is busy|service unavailable|temporarily unavailable|bad gateway|gateway time-?out|internal server error|\b(500|502|503|504|520|522|524|529)\b|could not reach|fetch failed|socket hang up|stream (error|disconnected)|connection (error|reset|refused|closed)|econnreset|econnrefused|etimedout|enotfound|eai_again/i],
+];
+/* causes:end */
+function classifyAnswer(a, finished) {
+  if (!a) return finished ? {kind: 'failed', cause: null, text: 'no answer was saved for this round'} : {kind: 'pending', cause: null, text: ''};
+  if (a.status === 'ok') return {kind: 'answered', cause: null, text: '', ms: a.latencyMs};
+  if (a.status === 'late' || a.status === 'invalid') return {kind: a.status, cause: null, text: (a.problems || [])[0] || ''};
+  const text = String(a.error || (a.problems || [])[0] || '').trim();
+  const cause = CAUSES.find(([, pattern]) => pattern.test(text))?.[0] || null;
+  return {kind: cause ? 'unavailable' : 'failed', cause, text};
+}
+const betValue = p => p.state === 'open' ? p.shares * (p.mark ?? p.avgPrice) - p.cost : p.pnl;
+// Every round's answers, read once each: a finished round never changes. Returns true when something new arrived.
+async function loadPlayed() {
+  const names = Object.keys(ui.view.state.contestants);
+  let changed = false;
+  for (const n of ui.view.roundNumbers) {
+    if (ui.played.get(n)?.finished) continue;
+    let r = ui.view.rounds.find(x => x && x.round === n);
+    if (!r) { try { r = await (await fetch(`/api/round?n=${n}`)).json(); } catch { continue; } }
+    if (!r || r.error) continue;
+    const finished = Boolean(r.finishedAt);
+    ui.played.set(n, {finished, games: (r.slate || []).length, answers: Object.fromEntries(names.map(name => [name, classifyAnswer(r.answers?.[name], finished)]))});
+    changed = true;
+  }
+  return changed;
+}
+const roundsOfKind = (name, kind) => [...ui.played.values()].filter(r => r.finished && r.answers[name]?.kind === kind).length;
+// How long a contestant takes when it does answer. Until the rounds are read this is the plain average of its calls.
+function answerSeconds(c) {
+  const times = [...ui.played.values()].map(r => r.answers[c.name]).filter(a => a && a.kind === 'answered' && typeof a.ms === 'number').map(a => a.ms);
+  return (times.length ? times.reduce((a, b) => a + b, 0) / times.length : c.usage.latencyMsTotal / c.usage.calls) / 1000;
+}
+const unavailableText = a => { const k = classifyAnswer(a, true); return k.kind === 'unavailable' ? `unavailable this round (${k.cause}), so it placed no bets: ${k.text}` : null; };
+const COUNT_WORDS = ['no', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight'];
+// Rules tab: the result over every round, and over only the rounds in which every AI answered.
+function likeSection() {
+  const cs = Object.values(ui.view.state.contestants), ais = cs.filter(c => !c.baseline);
+  const played = [...ui.played.entries()].filter(([, r]) => r.finished && r.games);
+  const fair = new Set(played.filter(([, r]) => ais.every(c => r.answers[c.name]?.kind === 'answered')).map(([n]) => n));
+  const all = COUNT_WORDS[ais.length] || ais.length;
+  const sum = ps => [`${ps.length} bets`, signed(ps.reduce((t, p) => t + betValue(p), 0))];
+  const rows = cs.map(c => {
+    const out = {};
+    for (const [, r] of played) { const a = r.answers[c.name]; if (a && a.kind !== 'answered') { const k = a.cause ? `unavailable (${a.cause})` : a.kind; out[k] = (out[k] || 0) + 1; } }
+    const sat = Object.entries(out).map(([k, n]) => `${n} ${k}`).join(', ');
+    const everyRound = sum(c.account.positions), fairRounds = sum(c.account.positions.filter(p => fair.has(p.round)));
+    return el('tr', {'data-like': c.name},
+      el('td', {}, el('span', {class: 'state'}, el('span', {class: 'dot', style: `--series:${colorOf(c)}`}), short(c.label))),
+      el('td', {class: 'num'}, everyRound[0]), el('td', {class: 'num'}, el('span', {class: 't'}, everyRound[1])),
+      el('td', {class: 'num'}, fairRounds[0]), el('td', {class: 'num'}, el('span', {class: 't'}, fairRounds[1])),
+      el('td', {}, c.baseline ? 'not an AI' : sat || 'none'));
+  });
+  const left = played.length - fair.size;
+  return [
+    el('h3', {}, 'When an AI could not answer'),
+    el('p', {}, "A call can fail because a plan limit was reached, the service was down or a login had expired. That is not the AI's doing, so the AI is shown as ", el('b', {}, 'unavailable'), ` for that round and places no bets in it. The result is given twice: over every round, and over only the rounds in which all ${all} AIs answered.`),
+    el('div', {class: 'costbox', id: 'like'},
+      el('table', {}, el('thead', {}, el('tr', {}, el('th', {}, ''), el('th', {class: 'num', colspan: 2}, `Every round (${played.length})`), el('th', {class: 'num', colspan: 2}, `All ${all} answered (${fair.size})`), el('th', {}, 'Sat out'))), el('tbody', {}, ...rows)),
+      el('p', {style: 'margin:6px 6px 0'}, !played.length ? 'No round has finished yet.' : left ? `${left} of ${played.length} rounds are left out of the second pair of columns, because at least one AI gave no answer in them.` : 'Every AI has answered in every round so far, so both pairs of columns are the same.')),
+  ];
+}
 
 // ---------- header and scoreboard ----------
 function renderHeader() {
@@ -246,13 +316,14 @@ function renderBoard() {
     const pos = c.account.positions, won = pos.filter(p => p.state === 'won').length, lost = pos.filter(p => p.state === 'lost').length, open = openOf(c);
     const pnl = eq - c.account.startingCash, u = c.usage;
     const skipShare = c.wanted.asked ? c.wanted.skip / c.wanted.asked : null;
+    const away = roundsOfKind(c.name, 'unavailable');
     return el('div', {class: `card${c.baseline ? ' baseline' : ''}${ui.focus === c.name ? ' focus' : ''}`, style: `--series:${colorOf(c)}`, 'data-card': c.name, onclick: () => arena.focus(ui.focus === c.name ? null : c.name)},
       el('div', {class: 'who'}, el('span', {class: 'rank'}, `#${i + 1}`), el('span', {class: 'name'}, c.label), el('span', {class: 'model'}, c.baseline ? `seed ${c.seed ?? ''}` : (c.reportedModel || c.configuredModel || ''))),
       el('div', {class: 'money'}, el('span', {class: 'equity'}, money(eq)), el('span', {class: `delta ${pnl > 0.004 ? 'up' : pnl < -0.004 ? 'down' : ''}`}, el('span', {class: 'arrow'}), signed(pnl))),
       el('div', {class: 'facts'},
         el('span', {}, el('b', {}, pos.length), ' bets · ', el('b', {}, won), ' won · ', el('b', {}, lost), ' lost · ', el('b', {}, open.length), ` open (${money(open.reduce((a, p) => a + p.cost, 0))})`),
         c.baseline ? el('span', {}, 'Not an AI: two random picks a round') : el('span', {}, skipShare === null ? 'No answers yet' : ['Would have skipped ', el('b', {}, pct(skipShare)), ' of games by choice']),
-        c.baseline ? el('span', {}, 'The line to beat') : el('span', {}, u.calls ? ['Answers in ', el('b', {}, `${(u.latencyMsTotal / u.calls / 1000).toFixed(1)} s`), ` · ${u.late} late · ${u.invalid + u.errors} failed`] : 'Waiting for round 1')));
+        c.baseline ? el('span', {}, 'The line to beat') : el('span', {}, u.calls ? ['Answers in ', el('b', {}, `${answerSeconds(c).toFixed(1)} s`), ` · ${u.late} late · ${Math.max(0, u.invalid + u.errors - away)} failed`, away ? [' · ', el('b', {}, `${away} unavailable`)] : null] : 'Waiting for round 1')));
   }));
 }
 
@@ -352,7 +423,7 @@ async function renderRound() {
     const a = r.answers?.[c.name];
     const text = !a ? 'no answer yet' : a.status === 'ok' ? (c.baseline ? 'picked at random' : `answered in ${(a.latencyMs / 1000).toFixed(1)} s`)
       : a.status === 'late' ? `late: no answer in ${s.rules.answerDeadlineSec} s, so it sat this round out`
-      : a.status === 'invalid' ? 'its answer could not be read, so it sat this round out' : `error, so it sat this round out: ${a.error || ''}`;
+      : a.status === 'invalid' ? 'its answer could not be read, so it sat this round out' : unavailableText(a) || `error, so it sat this round out: ${a.error || ''}`;
     return el('div', {}, el('span', {class: 'dot', style: `--series:${colorOf(c)}`}), el('b', {style: 'color:var(--text-primary)'}, short(c.label)), el('span', {}, text));
   }));
   const games = r.slate.map(g => {
@@ -415,6 +486,7 @@ function renderRules() {
     el('p', {}, el('b', {}, 'Random picks'), ' is not an AI. It bets two random sides a round from the same games at the same stake, from a saved seed. An AI that cannot beat it has not shown skill.'),
     el('h3', {}, 'Why games, and no crypto'),
     el('p', {}, "On 8 October 2026 Predictefy's paper engine had no live order book for any short-dated crypto market: 30 were tested on both sides, 27 on Polymarket and 3 on Kalshi, and none took an order. It does hold a live book for every outcome the sports screen shows as a live, fresh quote, so this run trades games."),
+    ...likeSection(),
     el('h3', {}, 'Where the numbers come from'),
     el('p', {class: 'endpoint'}, el('b', {}, 'GET /v1/sports/screen'), ' games, prices on each venue, Predictefy fair price · 5 credits a page'),
     el('p', {class: 'endpoint'}, el('b', {}, 'POST /v1/paper/orders'), ' every bet, filled against the real order book · 0 credits'),
@@ -438,6 +510,7 @@ async function render() {
   ui.order = Object.keys(ui.view.state.contestants);
   renderHeader(); renderBoard(); renderTabs(); renderChart(); renderBets(); renderRules();
   await renderRound();
+  try { if (await loadPlayed()) { renderBoard(); renderRules(); } } catch { /* the next refresh tries again */ }
 }
 async function refresh() {
   try {
