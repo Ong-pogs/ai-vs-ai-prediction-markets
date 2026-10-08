@@ -1,7 +1,465 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><title>AI vs AI</title></head>
-<body><pre id="out">loading</pre>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI vs AI: paper trading on Polymarket and Kalshi</title>
+<style>
+  :root {
+    color-scheme: dark;
+    --page: #0e0e0d; --surface-1: #1a1a19; --surface-2: #232321; --line: #32322f; --line-soft: #282826;
+    --text-primary: #ffffff; --text-secondary: #c3c2b7; --text-muted: #8f8e85;
+    --brand: #e23d34;                      /* Predictefy red: chrome only, never a data series */
+    --good: #0ca30c; --critical: #d03b3b; --warning: #fab219;
+    --display: "Bahnschrift", "DIN Alternate", "Segoe UI Variable Display", "Segoe UI", sans-serif;
+    --body: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+    --mono: "Cascadia Mono", "Cascadia Code", Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    background: var(--page); color: var(--text-primary); font-family: var(--body); font-size: 17px; line-height: 1.35;
+    background-image: repeating-linear-gradient(135deg, rgba(255,255,255,.018) 0 1px, transparent 1px 9px);
+    overflow: hidden;
+  }
+  .app { height: 100vh; display: grid; grid-template-rows: auto auto minmax(0, 1fr) auto; gap: 14px; padding: 16px 22px 12px; }
+  .endpoint { font-family: var(--mono); font-size: 12.5px; color: var(--text-muted); letter-spacing: .01em; }
+  .endpoint b { color: var(--text-secondary); font-weight: 500; }
+
+  /* ---- header ---- */
+  header { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 28px; align-items: end; border-top: 3px solid var(--brand); padding-top: 12px; }
+  .tag { font-family: var(--display); font-stretch: 85%; font-size: 14px; letter-spacing: .16em; text-transform: uppercase; color: var(--brand); font-weight: 600; }
+  h1 { font-family: var(--display); font-stretch: 88%; font-weight: 700; font-size: 40px; line-height: 1.02; margin: 2px 0 6px; letter-spacing: .005em; }
+  .rule { font-size: 17.5px; color: var(--text-secondary); max-width: 1240px; }
+  .rule b { color: var(--text-primary); font-weight: 600; }
+  .clock { text-align: right; display: grid; gap: 4px; justify-items: end; }
+  .pill { display: inline-flex; align-items: center; gap: 8px; font-family: var(--display); font-stretch: 85%; font-size: 15px; letter-spacing: .14em; text-transform: uppercase; padding: 4px 12px 3px; border: 1px solid var(--line); border-radius: 999px; color: var(--text-secondary); }
+  .pill i { width: 9px; height: 9px; border-radius: 50%; background: var(--text-muted); }
+  .pill.live i { background: var(--good); box-shadow: 0 0 0 0 rgba(12,163,12,.6); animation: pulse 2s infinite; }
+  .pill.done i { background: var(--brand); }
+  @keyframes pulse { 70% { box-shadow: 0 0 0 9px rgba(12,163,12,0); } 100% { box-shadow: 0 0 0 0 rgba(12,163,12,0); } }
+  .roundno { font-family: var(--display); font-stretch: 82%; font-size: 34px; font-weight: 700; line-height: 1; }
+  .roundno small { font-size: 19px; color: var(--text-muted); font-weight: 500; }
+  .next { color: var(--text-secondary); font-size: 15.5px; }
+  .next b { font-family: var(--display); font-variant-numeric: tabular-nums; color: var(--text-primary); font-weight: 600; font-size: 18px; }
+
+  /* ---- scoreboard ---- */
+  .board { display: grid; grid-template-columns: repeat(var(--cards, 4), minmax(0, 1fr)); gap: 12px; }
+  .card { background: var(--surface-1); border: 1px solid var(--line-soft); border-radius: 10px; padding: 12px 16px 12px 20px; position: relative; cursor: pointer; transition: border-color .15s, transform .15s; min-width: 0; }
+  .card::before { content: ""; position: absolute; left: 0; top: 10px; bottom: 10px; width: 5px; border-radius: 0 4px 4px 0; background: var(--series); }
+  .card:hover, .card.focus { border-color: var(--series); }
+  .card.focus { transform: translateY(-2px); }
+  .card .who { display: flex; align-items: baseline; gap: 10px; white-space: nowrap; overflow: hidden; }
+  .card .rank { font-family: var(--display); font-size: 15px; color: var(--text-muted); font-weight: 600; }
+  .card .name { font-family: var(--display); font-stretch: 88%; font-size: 23px; font-weight: 700; }
+  .card .model { font-family: var(--mono); font-size: 12.5px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; }
+  .card .money { display: flex; align-items: baseline; gap: 12px; margin: 2px 0 4px; }
+  .card .equity { font-family: var(--display); font-stretch: 86%; font-size: 52px; font-weight: 700; line-height: 1; letter-spacing: -.01em; }
+  .delta { font-family: var(--display); font-size: 21px; font-weight: 600; color: var(--text-secondary); display: inline-flex; align-items: center; gap: 5px; }
+  .delta .arrow { width: 0; height: 0; border-left: 7px solid transparent; border-right: 7px solid transparent; }
+  .delta.up .arrow { border-bottom: 11px solid var(--good); }
+  .delta.down .arrow { border-top: 11px solid var(--critical); }
+  .card .facts { display: grid; gap: 2px; font-size: 15.5px; color: var(--text-secondary); }
+  .card .facts b { color: var(--text-primary); font-weight: 600; }
+  .card.baseline { background: transparent; border-style: dashed; }
+  .card.baseline .equity { color: var(--text-secondary); }
+
+  /* ---- main ---- */
+  main { display: grid; grid-template-columns: minmax(0, 1.72fr) minmax(0, 1fr); gap: 14px; min-height: 0; }
+  .panel { background: var(--surface-1); border: 1px solid var(--line-soft); border-radius: 10px; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
+  .panel-head { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 12px 18px 8px; }
+  .panel-head h2 { font-family: var(--display); font-stretch: 88%; font-size: 22px; margin: 0; font-weight: 700; }
+  .legend { display: flex; gap: 18px; flex-wrap: wrap; font-size: 15.5px; color: var(--text-secondary); }
+  .legend span { display: inline-flex; align-items: center; gap: 7px; }
+  .key { width: 22px; height: 0; border-top: 3px solid var(--series); border-radius: 2px; }
+  .key.thin { border-top-width: 2px; border-top-style: dotted; }
+  .chart-wrap { position: relative; flex: 1; min-height: 0; padding: 0 8px 4px; }
+  svg text { font-family: var(--body); }
+  .tip { position: absolute; pointer-events: none; background: #0b0b0a; border: 1px solid var(--line); border-radius: 8px; padding: 9px 12px; font-size: 14.5px; min-width: 200px; opacity: 0; transition: opacity .1s; z-index: 5; }
+  .tip h4 { margin: 0 0 6px; font-size: 13.5px; color: var(--text-muted); font-weight: 500; }
+  .tip div { display: grid; grid-template-columns: 22px 1fr auto; gap: 8px; align-items: center; line-height: 1.5; color: var(--text-secondary); }
+  .tip div b { color: var(--text-primary); font-family: var(--display); font-size: 16px; font-variant-numeric: tabular-nums; }
+  .panel-foot { padding: 6px 18px 10px; display: flex; gap: 18px; flex-wrap: wrap; border-top: 1px solid var(--line-soft); }
+
+  /* ---- tabs ---- */
+  .tabs { display: flex; gap: 4px; padding: 10px 12px 0; border-bottom: 1px solid var(--line-soft); }
+  .tabs button { font-family: var(--display); font-stretch: 88%; font-size: 18px; font-weight: 600; color: var(--text-muted); background: none; border: 0; border-bottom: 3px solid transparent; padding: 6px 12px 9px; cursor: pointer; }
+  .tabs button:hover { color: var(--text-secondary); }
+  .tabs button.on { color: var(--text-primary); border-bottom-color: var(--brand); }
+  .tab { flex: 1; min-height: 0; overflow-y: auto; padding: 12px 16px 16px; display: none; scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
+  .tab.on { display: block; }
+  .stepper { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 8px; }
+  .stepper h3 { font-family: var(--display); font-size: 20px; margin: 0; font-weight: 700; }
+  .stepper h3 small { color: var(--text-muted); font-weight: 500; font-size: 15px; margin-left: 8px; }
+  .stepper button, .chip { font-family: var(--body); font-size: 14.5px; color: var(--text-secondary); background: var(--surface-2); border: 1px solid var(--line); border-radius: 7px; padding: 4px 11px; cursor: pointer; }
+  .stepper button:disabled { opacity: .35; cursor: default; }
+  .chip.on { color: var(--text-primary); border-color: var(--series, var(--text-secondary)); }
+  .chips { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
+  .answerers { display: grid; gap: 4px; margin: 2px 0 12px; font-size: 14.5px; color: var(--text-secondary); }
+  .answerers div { display: grid; grid-template-columns: 16px 86px 1fr; gap: 8px; align-items: center; }
+  .dot { display: inline-block; width: 11px; height: 11px; border-radius: 50%; background: var(--series); box-shadow: 0 0 0 2px var(--surface-1); flex: none; }
+  .game { border-top: 1px solid var(--line-soft); padding: 10px 0 8px; }
+  .game h4 { margin: 0; font-size: 17.5px; font-weight: 600; }
+  .game .meta { font-size: 14.5px; color: var(--text-secondary); margin: 2px 0 6px; }
+  .game .meta .hidden-fact { color: var(--text-muted); }
+  .call { display: grid; grid-template-columns: 16px 62px 76px minmax(0, 1fr); gap: 8px; align-items: baseline; font-size: 14.5px; padding: 2px 0; color: var(--text-secondary); }
+  .call .dot { align-self: center; }
+  .call .nm { color: var(--text-primary); font-weight: 600; }
+  .call .wanted { font-family: var(--mono); font-size: 12.5px; }
+  .call .why { min-width: 0; }
+  .bet { display: inline-block; font-family: var(--display); font-size: 13.5px; letter-spacing: .04em; font-weight: 600; color: #0e0e0d; background: var(--series); border-radius: 4px; padding: 1px 7px 0; margin-right: 7px; }
+  .bet.miss { background: transparent; color: var(--text-muted); border: 1px solid var(--line); }
+  table { width: 100%; border-collapse: collapse; font-size: 14.5px; }
+  th { text-align: left; font-weight: 500; color: var(--text-muted); font-size: 13px; padding: 4px 6px; border-bottom: 1px solid var(--line); position: sticky; top: -12px; background: var(--surface-1); }
+  td { padding: 6px; border-bottom: 1px solid var(--line-soft); vertical-align: top; color: var(--text-secondary); }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  td .t { color: var(--text-primary); }
+  .state { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+  .state i { width: 9px; height: 9px; border-radius: 2px; background: var(--text-muted); }
+  .state.won i { background: var(--good); border-radius: 50%; }
+  .state.lost i { background: var(--critical); transform: rotate(45deg); }
+  tr.how td { font-family: var(--mono); font-size: 12px; color: var(--text-muted); padding-top: 0; }
+  .prose h3 { font-family: var(--display); font-size: 18.5px; margin: 14px 0 4px; font-weight: 700; }
+  .prose h3:first-child { margin-top: 0; }
+  .prose p { margin: 0 0 6px; color: var(--text-secondary); font-size: 15.5px; }
+  .prose p b { color: var(--text-primary); font-weight: 600; }
+  .prose a { color: var(--text-primary); }
+  .costbox { border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; margin-top: 6px; background: var(--surface-2); }
+  .costbox table td, .costbox table th { border: 0; padding: 2px 6px; background: none; position: static; }
+  .notice { border: 1px solid var(--warning); border-radius: 8px; padding: 8px 12px; margin-top: 8px; font-size: 15px; }
+  footer { display: flex; justify-content: space-between; gap: 24px; font-size: 14px; color: var(--text-muted); }
+  footer b { color: var(--text-secondary); font-weight: 500; }
+  .empty { color: var(--text-muted); padding: 30px 0; text-align: center; }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div>
+      <div class="tag">Paper trading · Predictefy sports screen · Polymarket + Kalshi</div>
+      <h1 id="title">AI vs AI</h1>
+      <div class="rule" id="rule"></div>
+    </div>
+    <div class="clock">
+      <span class="pill" id="pill"><i></i><span id="pillText">Connecting</span></span>
+      <div class="roundno" id="roundno"></div>
+      <div class="next" id="next"></div>
+    </div>
+  </header>
+
+  <section class="board" id="board"></section>
+
+  <main>
+    <section class="panel">
+      <div class="panel-head">
+        <h2>Paper balance after every round</h2>
+        <div class="legend" id="legend"></div>
+      </div>
+      <div class="chart-wrap" id="chartWrap"><svg id="chart" width="100%" height="100%"></svg><div class="tip" id="tip"></div></div>
+      <div class="panel-foot">
+        <span class="endpoint">balance = cash + open bets at Predictefy's catalogue price · <b>GET /api/{venue}/fetchMarket</b></span>
+        <span class="endpoint">fills · <b>POST /v1/paper/orders</b></span>
+      </div>
+    </section>
+
+    <section class="panel">
+      <nav class="tabs" id="tabs">
+        <button data-tab="round" class="on">This round</button>
+        <button data-tab="bets">Every bet</button>
+        <button data-tab="rules">Rules and data</button>
+      </nav>
+      <div class="tab on" id="tab-round"></div>
+      <div class="tab" id="tab-bets"></div>
+      <div class="tab prose" id="tab-rules"></div>
+    </section>
+  </main>
+
+  <footer>
+    <span><b>Paper results are not real results.</b> The paper engine fills against the real order book, but it does not model queue position, market impact or delay.</span>
+    <span id="foot"></span>
+  </footer>
+</div>
+
 <script>
-async function tick() { const r = await fetch('/api/state'); const v = await r.json(); document.getElementById('out').textContent = JSON.stringify({run: v.state.runId, status: v.state.status, round: v.state.roundsDone + ' of ' + v.state.rounds, equity: v.state.equity.at(-1)}, null, 2); }
-tick(); setInterval(tick, 10000);
-</script></body></html>
+'use strict';
+const $ = id => document.getElementById(id);
+const SVG = 'http://www.w3.org/2000/svg';
+function el(tag, props, ...kids) {
+  const node = document.createElement(tag);
+  for (const [k, v] of Object.entries(props || {})) {
+    if (v === null || v === undefined || v === false) continue;
+    if (k === 'class') node.className = v;
+    else if (k === 'style') node.style.cssText = v;
+    else if (k.startsWith('on')) node.addEventListener(k.slice(2), v);
+    else node.setAttribute(k, v === true ? '' : v);
+  }
+  for (const kid of kids.flat(3)) if (kid !== null && kid !== undefined && kid !== false) node.append(kid.nodeType ? kid : document.createTextNode(String(kid)));
+  return node;
+}
+function svg(tag, attrs, text) {
+  const node = document.createElementNS(SVG, tag);
+  for (const [k, v] of Object.entries(attrs || {})) node.setAttribute(k, v);
+  if (text !== undefined) node.textContent = text;
+  return node;
+}
+const money = x => `${x < 0 ? '-' : ''}$${Math.abs(x).toFixed(2)}`;
+const signed = x => `${x < -0.004 ? '-' : '+'}$${Math.abs(x).toFixed(2)}`;
+const cents = p => `${Number((p * 100).toFixed(1))}¢`;
+const pct = p => `${Math.round(p * 100)}%`;
+const clock = iso => new Date(iso).toLocaleTimeString([], {hour: 'numeric', minute: '2-digit'});
+const dayClock = iso => new Date(iso).toLocaleString([], {weekday: 'short', hour: 'numeric', minute: '2-digit'});
+const short = label => label.split(' ')[0];
+const VENUE = {polymarket: 'Polymarket', kalshi: 'Kalshi'};
+const GREY = '#8f8e88', FALLBACK = ['#3987e5', '#d95926', '#199e70', '#c98500', '#d55181', '#008300', '#9085e9', '#e66767'];
+
+const ui = {view: null, tab: 'round', round: null, focus: null, order: [], roundCache: new Map(), fetchedAt: 0};
+const colorOf = c => c.baseline ? GREY : (c.color || FALLBACK[ui.order.indexOf(c.name) % FALLBACK.length]);
+const openOf = c => c.account.positions.filter(p => p.state === 'open');
+const equityOf = c => c.account.cash + openOf(c).reduce((sum, p) => sum + p.shares * (p.mark ?? p.avgPrice), 0);
+
+// ---------- header and scoreboard ----------
+function renderHeader() {
+  const s = ui.view.state, now = Date.parse(ui.view.now) + (Date.now() - ui.fetchedAt);
+  $('title').textContent = s.title;
+  $('rule').replaceChildren(el('b', {}, 'The rule. '), s.rules.text, ' ', el('span', {style: 'color:var(--text-muted)'}, 'Each one sees the teams and the prices, nothing else.'));
+  const start = Date.parse(s.startAt);
+  const live = s.status === 'running' && s.stage === 'trading' && now >= start;
+  $('pill').className = `pill ${live ? 'live' : (s.status === 'finished' || s.stage !== 'trading' ? 'done' : '')}`;
+  $('pillText').textContent = s.status === 'finished' ? 'Finished' : s.status === 'stopped' ? 'Paused' : now < start ? 'Starts soon' : s.stage === 'settling' ? 'Settling' : 'Live';
+  $('roundno').replaceChildren(`Round ${s.roundsDone + s.missedRounds.length}`, el('small', {}, ` of ${s.rounds}`));
+  const nextAt = s.nextRound < s.rounds ? start + s.nextRound * s.intervalSec * 1000 : null;
+  const left = nextAt === null ? null : Math.max(0, nextAt - now);
+  const mmss = ms => `${String(Math.floor(ms / 60000)).padStart(2, '0')}:${String(Math.floor(ms / 1000) % 60).padStart(2, '0')}`;
+  const next = s.status === 'finished' ? [`Ran ${dayClock(s.startAt)} to ${dayClock(s.endAt)}`]
+    : left === null ? ['Last round done. Ends ', el('b', {}, clock(s.endAt))]
+    : [now < start ? 'First round in ' : 'Next round in ', el('b', {}, mmss(left)), ` · ends ${dayClock(s.endAt)}`];
+  $('next').replaceChildren(...next);
+  $('foot').textContent = `Run ${s.runId} · ${s.predictefy.credits.toLocaleString()} Predictefy credits used`;
+}
+
+function renderBoard() {
+  const s = ui.view.state;
+  const rows = Object.values(s.contestants).map(c => ({c, eq: equityOf(c)})).sort((a, b) => b.eq - a.eq);
+  const board = $('board');
+  board.style.setProperty('--cards', rows.length);
+  board.replaceChildren(...rows.map(({c, eq}, i) => {
+    const pos = c.account.positions, won = pos.filter(p => p.state === 'won').length, lost = pos.filter(p => p.state === 'lost').length, open = openOf(c);
+    const pnl = eq - c.account.startingCash, u = c.usage;
+    const skipShare = c.wanted.asked ? c.wanted.skip / c.wanted.asked : null;
+    return el('div', {class: `card${c.baseline ? ' baseline' : ''}${ui.focus === c.name ? ' focus' : ''}`, style: `--series:${colorOf(c)}`, 'data-card': c.name, onclick: () => arena.focus(ui.focus === c.name ? null : c.name)},
+      el('div', {class: 'who'}, el('span', {class: 'rank'}, `#${i + 1}`), el('span', {class: 'name'}, c.label), el('span', {class: 'model'}, c.baseline ? `seed ${c.seed ?? ''}` : (c.reportedModel || c.configuredModel || ''))),
+      el('div', {class: 'money'}, el('span', {class: 'equity'}, money(eq)), el('span', {class: `delta ${pnl > 0.004 ? 'up' : pnl < -0.004 ? 'down' : ''}`}, el('span', {class: 'arrow'}), signed(pnl))),
+      el('div', {class: 'facts'},
+        el('span', {}, el('b', {}, pos.length), ' bets · ', el('b', {}, won), ' won · ', el('b', {}, lost), ' lost · ', el('b', {}, open.length), ` open (${money(open.reduce((a, p) => a + p.cost, 0))})`),
+        c.baseline ? el('span', {}, 'Not an AI: two random picks a round') : el('span', {}, skipShare === null ? 'No answers yet' : ['Would have skipped ', el('b', {}, pct(skipShare)), ' of games by choice']),
+        c.baseline ? el('span', {}, 'The line to beat') : el('span', {}, u.calls ? ['Answers in ', el('b', {}, `${(u.latencyMsTotal / u.calls / 1000).toFixed(1)} s`), ` · ${u.late} late · ${u.invalid + u.errors} failed`] : 'Waiting for round 1')));
+  }));
+}
+
+// ---------- the chart: one line per contestant, one axis, dollars ----------
+function niceTicks(lo, hi) {
+  const span = Math.max(hi - lo, 1), step = [0.5, 1, 2, 2.5, 5, 10, 20, 25, 50].find(x => span / x <= 6) || 100;
+  const ticks = [];
+  for (let t = Math.ceil(lo / step) * step; t <= hi + 1e-9; t += step) ticks.push(Number(t.toFixed(2)));
+  return ticks;
+}
+function renderChart() {
+  const s = ui.view.state, wrap = $('chartWrap'), chart = $('chart');
+  const W = wrap.clientWidth - 16, H = wrap.clientHeight - 6;
+  if (W < 200 || H < 120) return;
+  chart.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  chart.replaceChildren();
+  const cs = Object.values(s.contestants);
+  const start = Date.parse(s.startAt), end = Date.parse(s.endAt);
+  const points = [
+    {at: start, label: 'Start', values: Object.fromEntries(cs.map(c => [c.name, c.account.startingCash]))},
+    ...s.equity.map(e => ({at: Date.parse(e.at), label: typeof e.round === 'number' ? `After round ${e.round}` : 'After the last round', values: e.values})),
+  ];
+  const last = Math.max(end, points.at(-1).at);
+  const all = points.flatMap(p => Object.values(p.values));
+  const pad = Math.max(1.5, (Math.max(...all) - Math.min(...all)) * 0.18);
+  const lo = Math.min(...all) - pad, hi = Math.max(...all) + pad;
+  const m = {l: 58, r: 172, t: 14, b: 34};
+  const x = t => m.l + (t - start) / (last - start) * (W - m.l - m.r), y = v => m.t + (hi - v) / (hi - lo) * (H - m.t - m.b);
+  for (const t of niceTicks(lo, hi)) {
+    chart.append(svg('line', {x1: m.l, x2: W - m.r, y1: y(t), y2: y(t), stroke: t === 100 ? '#55544f' : '#2a2a28', 'stroke-width': 1}));
+    chart.append(svg('text', {x: m.l - 10, y: y(t) + 5, 'text-anchor': 'end', fill: '#8f8e85', 'font-size': 14, style: 'font-variant-numeric:tabular-nums'}, `$${t}`));
+  }
+  const hours = (last - start) / 3600000, every = hours <= 2 ? 0.5 : hours <= 8 ? 1 : hours <= 14 ? 2 : 4;
+  for (let h = 0; h <= hours + 1e-9; h += every) {
+    const t = start + h * 3600000;
+    chart.append(svg('line', {x1: x(t), x2: x(t), y1: H - m.b, y2: H - m.b + 5, stroke: '#55544f'}));
+    chart.append(svg('text', {x: x(t), y: H - m.b + 22, 'text-anchor': 'middle', fill: '#8f8e85', 'font-size': 14}, clock(new Date(t).toISOString())));
+  }
+  const ends = [];
+  for (const c of [...cs.filter(c => c.baseline), ...cs.filter(c => !c.baseline)]) {
+    const color = colorOf(c), dim = ui.focus && ui.focus !== c.name;
+    const d = points.map((p, i) => `${i ? 'L' : 'M'}${x(p.at).toFixed(1)},${y(p.values[c.name] ?? c.account.startingCash).toFixed(1)}`).join('');
+    chart.append(svg('path', {d, fill: 'none', stroke: color, 'stroke-width': c.baseline ? 2 : 2.5, 'stroke-linejoin': 'round', 'stroke-linecap': 'round', opacity: dim ? 0.25 : 1, ...(c.baseline ? {'stroke-dasharray': '1 6'} : {})}));
+    const lastPoint = points.at(-1), v = lastPoint.values[c.name] ?? c.account.startingCash;
+    chart.append(svg('circle', {cx: x(lastPoint.at), cy: y(v), r: 5, fill: color, stroke: '#1a1a19', 'stroke-width': 2, opacity: dim ? 0.25 : 1}));
+    ends.push({c, color, v, y: y(v), x: x(lastPoint.at), dim});
+  }
+  // The legend names every line. Labels also ride the line ends, spread apart with a leader when they would collide.
+  ends.sort((a, b) => a.y - b.y);
+  ends.forEach((e, i) => { e.ly = i === 0 ? e.y : Math.max(e.y, ends[i - 1].ly + 21); });
+  const overflow = ends.at(-1).ly - (H - m.b - 4);
+  if (overflow > 0) for (const e of ends) e.ly -= overflow;
+  for (const e of ends) {
+    const lx = Math.min(e.x + 16, W - m.r + 14);
+    if (Math.abs(e.ly - e.y) > 3) chart.append(svg('line', {x1: e.x + 7, y1: e.y, x2: lx - 4, y2: e.ly, stroke: '#55544f', 'stroke-width': 1}));
+    chart.append(svg('line', {x1: lx, x2: lx + 12, y1: e.ly, y2: e.ly, stroke: e.color, 'stroke-width': 3, opacity: e.dim ? 0.3 : 1}));
+    const label = svg('text', {x: lx + 18, y: e.ly + 5, fill: e.dim ? '#8f8e85' : '#ffffff', 'font-size': 15.5});
+    label.append(svg('tspan', {'font-weight': 600}, short(e.c.label)), svg('tspan', {dx: 7, fill: '#c3c2b7', style: 'font-variant-numeric:tabular-nums'}, money(e.v)));
+    chart.append(label);
+  }
+  // Hover: a crosshair finds the round, and one tooltip lists every contestant.
+  const hair = svg('line', {y1: m.t, y2: H - m.b, stroke: '#8f8e85', 'stroke-width': 1, opacity: 0});
+  const hit = svg('rect', {x: m.l, y: m.t, width: W - m.l - m.r, height: H - m.t - m.b, fill: 'transparent'});
+  chart.append(hair, hit);
+  const tip = $('tip');
+  hit.addEventListener('pointermove', ev => {
+    const box = chart.getBoundingClientRect(), px = (ev.clientX - box.left) * (W / box.width);
+    const p = points.reduce((best, q) => Math.abs(x(q.at) - px) < Math.abs(x(best.at) - px) ? q : best, points[0]);
+    hair.setAttribute('x1', x(p.at)); hair.setAttribute('x2', x(p.at)); hair.setAttribute('opacity', 1);
+    const rows = cs.map(c => ({c, v: p.values[c.name] ?? c.account.startingCash})).sort((a, b) => b.v - a.v);
+    tip.replaceChildren(el('h4', {}, `${p.label} · ${clock(new Date(p.at).toISOString())}`), ...rows.map(({c, v}) => el('div', {}, el('span', {class: `key${c.baseline ? ' thin' : ''}`, style: `--series:${colorOf(c)}`}), el('span', {}, c.label), el('b', {}, money(v)))));
+    const left = x(p.at) / W * box.width + 22;
+    tip.style.left = `${left + 230 > box.width ? left - 260 : left}px`;
+    tip.style.top = `${Math.max(8, ev.clientY - box.top - 40)}px`;
+    tip.style.opacity = 1;
+  });
+  hit.addEventListener('pointerleave', () => { hair.setAttribute('opacity', 0); tip.style.opacity = 0; });
+  $('legend').replaceChildren(...cs.map(c => el('span', {}, el('span', {class: `key${c.baseline ? ' thin' : ''}`, style: `--series:${colorOf(c)}`}), c.baseline ? `${c.label} (not an AI)` : c.label)));
+}
+
+// ---------- tab: this round ----------
+async function loadRound(n) {
+  const fromView = ui.view.rounds.find(r => r && r.round === n);
+  if (fromView) return fromView;
+  if (!ui.roundCache.has(n)) ui.roundCache.set(n, await (await fetch(`/api/round?n=${n}`)).json());
+  return ui.roundCache.get(n);
+}
+async function renderRound() {
+  const s = ui.view.state, numbers = ui.view.roundNumbers, host = $('tab-round');
+  if (!numbers.length) { host.replaceChildren(el('div', {class: 'empty'}, `Round 1 starts at ${clock(s.startAt)}. Every contestant gets the same list of games.`)); return; }
+  const n = ui.round && numbers.includes(ui.round) ? ui.round : numbers.at(-1);
+  const r = await loadRound(n), cs = Object.values(s.contestants), at = numbers.indexOf(n);
+  const head = el('div', {class: 'stepper'},
+    el('h3', {}, `Round ${r.round}`, el('small', {}, `${clock(r.startedAt)} · ${r.slate.length} games`)),
+    el('span', {}, el('button', {disabled: at <= 0, 'data-step': 'earlier', onclick: () => arena.showRound(numbers[at - 1])}, 'Earlier'), ' ', el('button', {disabled: at >= numbers.length - 1, 'data-step': 'later', onclick: () => arena.showRound(numbers[at + 1])}, 'Later')));
+  const answerers = el('div', {class: 'answerers'}, ...cs.map(c => {
+    const a = r.answers?.[c.name];
+    const text = !a ? 'no answer yet' : a.status === 'ok' ? (c.baseline ? 'picked at random' : `answered in ${(a.latencyMs / 1000).toFixed(1)} s`)
+      : a.status === 'late' ? `late: no answer in ${s.rules.answerDeadlineSec} s, so it sat this round out`
+      : a.status === 'invalid' ? 'its answer could not be read, so it sat this round out' : `error, so it sat this round out: ${a.error || ''}`;
+    return el('div', {}, el('span', {class: 'dot', style: `--series:${colorOf(c)}`}), el('b', {style: 'color:var(--text-primary)'}, short(c.label)), el('span', {}, text));
+  }));
+  const games = r.slate.map(g => {
+    const price = side => side.cells.map(c => `${cents(c.ask)} ${VENUE[c.venue] || c.venue}`).join(' · ');
+    const kickoff = Date.parse(g.kickoffAt);
+    const when = g.status === 'live' || kickoff <= Date.parse(r.startedAt) ? 'in play when asked' : `${kickoff > Date.now() ? 'starts' : 'started'} ${clock(g.kickoffAt)}`;
+    const calls = cs.map(c => {
+      const a = r.answers?.[c.name]?.answers?.[g.gid], bet = (r.bets?.[c.name] || []).find(b => b.gid === g.gid);
+      if (!a && !bet) return null;
+      const badge = !bet ? null : bet.shares
+        ? el('span', {class: 'bet', style: `--series:${colorOf(c)}`}, `BET ${bet.side} · ${bet.shares} @ ${cents(bet.avgPrice)} ${VENUE[bet.venue] || ''}`)
+        : el('span', {class: 'bet miss'}, `${bet.side}: ${bet.status.replace(/-/g, ' ')}`);
+      const odds = a?.pYes === null || a?.pYes === undefined ? null : pct(a.pYes);
+      const reason = c.baseline ? '' : c.kind === 'jev' ? (odds ? `own odds for YES: ${odds}. Jev gives odds, not reasons.` : '') : `${odds ? `Says ${odds} YES. ` : ''}${a?.reason || ''}`;
+      return el('div', {class: 'call'}, el('span', {class: 'dot', style: `--series:${colorOf(c)}`}), el('span', {class: 'nm'}, short(c.label)), el('span', {class: 'wanted'}, c.baseline ? 'random' : (a?.call || '').replace('_', ' ')), el('span', {class: 'why'}, badge, reason, bet?.why ? ` ${bet.why}` : ''));
+    });
+    const fair = g.yes.fair !== null && g.no.fair !== null ? el('span', {class: 'hidden-fact'}, ` · Predictefy fair ${pct(g.yes.fair)} / ${pct(g.no.fair)}, hidden from the AIs`) : null;
+    return el('div', {class: 'game', 'data-game': g.gid}, el('h4', {}, g.title), el('div', {class: 'meta'}, `${when} · YES ${g.yes.name} ${price(g.yes)} · NO ${g.no.name} ${price(g.no)}`, fair), ...calls);
+  });
+  host.replaceChildren(head,
+    el('div', {class: 'endpoint', style: 'margin-bottom:8px'}, 'games and prices · ', el('b', {}, 'GET /v1/sports/screen'), ' · middle column: what each AI wanted, before the rule'),
+    answerers, ...(r.notes || []).map(note => el('p', {class: 'meta', style: 'color:var(--text-secondary)'}, note)), ...games);
+}
+
+// ---------- tab: every bet ----------
+function renderBets() {
+  const s = ui.view.state, cs = Object.values(s.contestants), host = $('tab-bets');
+  const rows = cs.flatMap(c => c.account.positions.map(p => ({c, p}))).filter(r => !ui.focus || r.c.name === ui.focus).sort((a, b) => b.p.round - a.p.round || a.c.name.localeCompare(b.c.name));
+  const chips = el('div', {class: 'chips'}, el('button', {class: `chip${ui.focus ? '' : ' on'}`, onclick: () => arena.focus(null)}, 'Everyone'), ...cs.map(c => el('button', {class: `chip${ui.focus === c.name ? ' on' : ''}`, style: `--series:${colorOf(c)}`, onclick: () => arena.focus(c.name)}, c.label)));
+  if (!rows.length) { host.replaceChildren(chips, el('div', {class: 'empty'}, 'No bets yet.')); return; }
+  const body = rows.flatMap(({c, p}) => {
+    const value = p.state === 'open' ? p.shares * (p.mark ?? p.avgPrice) - p.cost : p.pnl;
+    const label = p.state === 'won' ? 'won' : p.state === 'lost' ? 'lost' : 'open';
+    return [
+      el('tr', {},
+        el('td', {class: 'num'}, p.round),
+        el('td', {}, el('span', {class: 'state'}, el('span', {class: 'dot', style: `--series:${colorOf(c)}`}), short(c.label))),
+        el('td', {}, el('span', {class: 't'}, p.sideName), el('br'), p.title),
+        el('td', {class: 'num'}, `${p.shares} @ ${cents(p.avgPrice)}`, el('br'), VENUE[p.venue] || p.venue),
+        el('td', {class: 'num'}, money(p.cost)),
+        el('td', {}, el('span', {class: `state ${label}`}, el('i'), label)),
+        el('td', {class: 'num'}, el('span', {class: 't'}, signed(value)), p.state === 'open' ? [el('br'), `at ${cents(p.mark ?? p.avgPrice)}`] : null)),
+      p.how ? el('tr', {class: 'how'}, el('td'), el('td', {colspan: 6}, p.how)) : null,
+    ];
+  });
+  host.replaceChildren(chips,
+    el('table', {}, el('thead', {}, el('tr', {}, el('th', {class: 'num'}, 'Rd'), el('th', {}, 'Who'), el('th', {}, 'Bet on'), el('th', {class: 'num'}, 'Filled'), el('th', {class: 'num'}, 'Cost'), el('th', {}, 'Result'), el('th', {class: 'num'}, 'Profit'))), el('tbody', {}, ...body)),
+    el('div', {class: 'endpoint', style: 'margin-top:10px'}, 'results · ', el('b', {}, 'GET /api/{venue}/fetchMarket'), ' · a bet settles only when Predictefy lists the market as resolved with a decisive price'));
+}
+
+// ---------- tab: rules and data ----------
+function renderRules() {
+  const s = ui.view.state, cs = Object.values(s.contestants), p = s.predictefy, host = $('tab-rules');
+  const perRound = s.roundsDone ? p.credits / s.roundsDone : null;
+  host.replaceChildren(
+    el('h3', {}, 'The rule'), el('p', {}, s.rules.text),
+    el('p', {}, 'Every contestant gets the same list of games and the same question for each: ', el('b', {}, 'buy YES, buy NO or skip'), ', its own probability, the side it leans to and how strongly. The harness then puts ', el('b', {}, `$${s.rules.stakeUsd}`), ` on each contestant's ${s.rules.betsPerRound.max} strongest picks, at whichever venue is cheaper after fees. A bet is the full stake or nothing: with less than $${s.rules.stakeUsd} free, a contestant sits that bet out.`),
+    el('h3', {}, 'Why the bets are forced, and why the fair price is hidden'),
+    el('p', {}, "In a first test every AI could see Predictefy's no-vig fair price and could skip. All three skipped every game, because the prices sat on the fair price. So each AI now has to place its two best bets a round, and the fair price is kept for scoring instead. What each one would have done by choice is still recorded: it is the \"would have skipped\" line on its card."),
+    el('p', {}, el('b', {}, 'Random picks'), ' is not an AI. It bets two random sides a round from the same games at the same stake, from a saved seed. An AI that cannot beat it has not shown skill.'),
+    el('h3', {}, 'Why games, and no crypto'),
+    el('p', {}, "On 8 October 2026 Predictefy's paper engine had no live order book for any short-dated crypto market: 30 were tested on both sides, 27 on Polymarket and 3 on Kalshi, and none took an order. It does hold a live book for every outcome the sports screen shows as a live, fresh quote, so this run trades games."),
+    el('h3', {}, 'Where the numbers come from'),
+    el('p', {class: 'endpoint'}, el('b', {}, 'GET /v1/sports/screen'), ' games, prices on each venue, Predictefy fair price · 5 credits a page'),
+    el('p', {class: 'endpoint'}, el('b', {}, 'POST /v1/paper/orders'), ' every bet, filled against the real order book · 0 credits'),
+    el('p', {class: 'endpoint'}, el('b', {}, 'GET /api/{venue}/fetchMarket'), ' results and the value of open bets · 1 credit'),
+    el('h3', {}, 'What this costs to run'),
+    el('div', {class: 'costbox'},
+      el('p', {}, el('b', {}, `${p.credits.toLocaleString()} Predictefy credits`), ` so far in ${p.calls.toLocaleString()} calls`, perRound === null ? '.' : `, about ${Math.round(perRound)} a round and ${Math.round(perRound * s.rounds).toLocaleString()} for the whole run. The free plan includes 25,000 credits a month.`),
+      el('table', {}, el('tbody', {}, ...Object.entries(p.byEndpoint).sort((a, b) => b[1].credits - a[1].credits).map(([name, row]) => el('tr', {}, el('td', {class: 'endpoint'}, name), el('td', {class: 'num'}, `${row.calls} calls`), el('td', {class: 'num'}, `${row.credits} credits`))))),
+      el('table', {style: 'margin-top:6px'}, el('tbody', {}, ...cs.filter(c => !c.baseline).map(c => el('tr', {}, el('td', {}, c.label), el('td', {class: 'num'}, `${c.usage.calls} calls`), el('td', {class: 'num'}, c.usage.totalTokens ? `${c.usage.totalTokens.toLocaleString()} tokens` : ''), el('td', {class: 'num'}, c.usage.costUsd ? `$${c.usage.costUsd.toFixed(c.usage.costUsd < 0.1 ? 4 : 2)} reported` : 'cost not reported')))))),
+    p.planNotice ? el('div', {class: 'notice'}, `Predictefy answered ${p.planNotice.code} on ${p.planNotice.endpoint}. The plan or its credits ran out: `, el('a', {href: ui.view.upgradeUrl, target: '_blank', rel: 'noopener'}, 'see the plans'), '.') : null,
+    s.lastError ? el('p', {class: 'endpoint', style: 'margin-top:8px'}, `last harness error ${s.lastError.at}: ${String(s.lastError.message).split('\n')[0]}`) : null);
+}
+
+// ---------- wiring ----------
+function renderTabs() {
+  for (const b of $('tabs').querySelectorAll('button')) b.classList.toggle('on', b.dataset.tab === ui.tab);
+  for (const name of ['round', 'bets', 'rules']) $(`tab-${name}`).classList.toggle('on', name === ui.tab);
+}
+async function render() {
+  if (!ui.view) return;
+  ui.order = Object.keys(ui.view.state.contestants);
+  renderHeader(); renderBoard(); renderTabs(); renderChart(); renderBets(); renderRules();
+  await renderRound();
+}
+async function refresh() {
+  try {
+    const res = await fetch('/api/state');
+    ui.view = await res.json();
+    ui.fetchedAt = Date.now();
+    await render();
+  } catch (error) { $('pillText').textContent = 'Reconnecting'; }
+}
+// Handles for anyone scripting the page (a screen recorder, a test).
+window.arena = {
+  setTab(tab) { ui.tab = tab; renderTabs(); },
+  showRound(n) { ui.round = n; return renderRound(); },
+  focus(name) { ui.focus = name; renderBoard(); renderChart(); renderBets(); },
+  refresh,
+  state: () => ui.view?.state,
+};
+$('tabs').addEventListener('click', ev => { if (ev.target.dataset.tab) arena.setTab(ev.target.dataset.tab); });
+window.addEventListener('resize', () => ui.view && renderChart());
+refresh();
+setInterval(refresh, 10000);
+setInterval(() => ui.view && renderHeader(), 1000);
+</script>
+</body>
+</html>
