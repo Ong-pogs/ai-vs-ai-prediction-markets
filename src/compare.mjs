@@ -90,10 +90,24 @@ export function likeForLike(state, rounds) {
     const both = played.map(p => p.round).filter(n => a.has(n) && b.has(n));
     sameBets.push({a: ais[i], b: ais[j], roundsBothBet: both.length, rounds: both.filter(n => a.get(n).join('|') === b.get(n).join('|'))});
   }
+  // Where the bets were filled, and on which venues the games on offer carried a price at all.
+  const betsByVenue = {}, gamesWithPriceOn = {};
+  let gamesOffered = 0;
+  for (const c of everyone) for (const p of c.account.positions) betsByVenue[p.venue] = (betsByVenue[p.venue] || 0) + 1;
+  for (const r of rounds) for (const g of r.slate || []) {
+    gamesOffered++;
+    for (const venue of new Set([...(g.yes?.cells || []), ...(g.no?.cells || [])].map(cell => cell.venue))) gamesWithPriceOn[venue] = (gamesWithPriceOn[venue] || 0) + 1;
+  }
+  // Which model each AI's answers named, round by round: a silent change of model would show up here.
+  const models = Object.fromEntries(ais.map(name => {
+    const seen = {};
+    for (const r of rounds) { const model = r.answers?.[name]?.model; if (model) seen[model] = (seen[model] || 0) + 1; }
+    return [name, seen];
+  }));
   return {
     runId: state.runId, ais, roundsPlanned: state.rounds, roundsMissed: (state.missedRounds || []).length, roundsInProgress: inProgress,
     roundsWithoutGames: withoutGames, roundsPlayed: played.length, roundsAllAnswered: fair.size, likeForLikeRounds: [...fair],
-    notAnswered, contestants, sameBets,
+    notAnswered, contestants, sameBets, betsByVenue, gamesOffered, gamesWithPriceOn, models,
   };
 }
 
@@ -115,6 +129,9 @@ export function comparisonLines(result) {
   }
   lines.push('');
   for (const pair of result.sameBets || []) lines.push(`same bets  ${pair.a} and ${pair.b} placed exactly the same bets in ${pair.rounds.length} of the ${pair.roundsBothBet} rounds in which both bet${pair.rounds.length ? ` (round${pair.rounds.length === 1 ? '' : 's'} ${pair.rounds.join(', ')})` : ''}`);
+  const list = counts => Object.entries(counts || {}).sort((a, b) => b[1] - a[1]).map(([key, n]) => `${key} ${n}`).join(', ') || 'none';
+  lines.push(`venues     bets filled: ${list(result.betsByVenue)} · ${result.gamesOffered ?? 0} games offered, with a price on: ${list(result.gamesWithPriceOn)}`);
+  for (const [name, seen] of Object.entries(result.models || {})) lines.push(`model      ${name}: ${Object.entries(seen).map(([model, n]) => `${model} in ${n} round${n === 1 ? '' : 's'}`).join(', ') || 'none reported'}`);
   const off = result.contestants.filter(c => Math.abs(c.balanceCheck) > 0.02);
   lines.push('', off.length ? `CHECK: the bets do not add up to the balance for ${off.map(c => `${c.name} (${signed(c.balanceCheck)})`).join(', ')}` : 'check: for every contestant the profit over every bet equals balance minus starting cash');
   return lines;

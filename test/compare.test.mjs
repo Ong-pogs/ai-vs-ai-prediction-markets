@@ -117,6 +117,29 @@ test('rounds in which two AIs placed exactly the same bets are counted', () => {
   assert.match(comparisonLines(result).join('\n'), /claude and gpt6 placed exactly the same bets in 2 of the 3 rounds in which both bet \(rounds 1, 3\)/);
 });
 
+test('bets are counted by venue, games by the venues that priced them, and answers by the model they named', () => {
+  const cell = venue => ({venue, ask: 0.5});
+  const game = (gid, ...venues) => ({gid, yes: {cells: venues.map(cell)}, no: {cells: [cell(venues[0])]}});
+  const run = {
+    runId: 'venues', rounds: 2, missedRounds: [],
+    contestants: {
+      claude: {name: 'claude', label: 'Claude', account: account([bet(1, 'open', 5, {venue: 'polymarket'}), bet(2, 'open', 5, {venue: 'kalshi'})])},
+      random: {name: 'random', label: 'Random picks', baseline: true, account: account([bet(1, 'open', 5, {venue: 'polymarket'})])},
+    },
+  };
+  const result = likeForLike(run, [
+    {round: 1, finishedAt: 't', slate: [game('g1', 'polymarket'), game('g2', 'polymarket', 'kalshi')], answers: {claude: {status: 'ok', model: 'claude-opus-5-5'}, random: ok(1)}},
+    {round: 2, finishedAt: 't', slate: [game('g1', 'kalshi')], answers: {claude: {status: 'ok', model: 'some-other-model'}, random: ok(1)}},
+  ]);
+  assert.deepEqual(result.betsByVenue, {polymarket: 2, kalshi: 1});
+  assert.equal(result.gamesOffered, 3);
+  assert.deepEqual(result.gamesWithPriceOn, {polymarket: 2, kalshi: 2});
+  assert.deepEqual(result.models, {claude: {'claude-opus-5-5': 1, 'some-other-model': 1}}, 'a change of model part-way is visible');
+  const text = comparisonLines(result).join('\n');
+  assert.match(text, /bets filled: polymarket 2, kalshi 1 · 3 games offered, with a price on: polymarket 2, kalshi 2/);
+  assert.match(text, /model {6}claude: claude-opus-5-5 in 1 round, some-other-model in 1 round/);
+});
+
 test('an open bet is worth its last price, and its fill price until one is read', () => {
   assert.equal(betValue(bet(1, 'open', 5, {mark: 0.6})), 1);
   assert.equal(betValue(bet(1, 'open', 5)), 0);
