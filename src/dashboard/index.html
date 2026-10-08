@@ -259,6 +259,20 @@ function answerSeconds(c) {
 }
 const unavailableText = a => { const k = classifyAnswer(a, true); return k.kind === 'unavailable' ? `unavailable this round (${k.cause}), so it placed no bets: ${k.text}` : null; };
 const COUNT_WORDS = ['no', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight'];
+// Whether this run's AIs were shown Predictefy's fair price. A run saved before the setting existed showed it.
+const fairShown = s => s.config?.facts?.fairPrice !== false;
+// Rules tab: why this run forces bets or hides the fair price, whichever of the two its config does.
+function whySection(s) {
+  const min = s.rules.betsPerRound.min, forced = min > 0, shown = fairShown(s);
+  if (!forced && shown) return [];
+  const bets = min === 1 ? 'its best bet' : `its ${COUNT_WORDS[min] || min} best bets`;
+  return [
+    el('h3', {}, forced && !shown ? 'Why the bets are forced, and why the fair price is hidden' : forced ? 'Why the bets are forced' : 'Why the fair price is hidden'),
+    el('p', {}, "In a first test every AI could see Predictefy's no-vig fair price and could skip. All three skipped every game, because the prices sat on the fair price. ",
+      forced && !shown ? `So each AI now has to place ${bets} a round, and the fair price is kept for scoring instead. ` : forced ? `So each AI now has to place ${bets} a round. In this run the AIs can still see the fair price. ` : 'So the fair price is no longer shown to the AIs, and is kept for scoring instead. ',
+      forced ? 'What each one would have done by choice is still recorded: it is the "would have skipped" line on its card.' : ''),
+  ];
+}
 // Rules tab: the result over every round, and over only the rounds in which every AI answered.
 function likeSection() {
   const cs = Object.values(ui.view.state.contestants), ais = cs.filter(c => !c.baseline);
@@ -291,7 +305,7 @@ function likeSection() {
 function renderHeader() {
   const s = ui.view.state, now = Date.parse(ui.view.now) + (Date.now() - ui.fetchedAt);
   $('title').textContent = s.title;
-  $('rule').replaceChildren(el('b', {}, 'The rule. '), s.rules.text, ' ', el('span', {style: 'color:var(--text-muted)'}, 'Each one sees the teams and the prices, nothing else.'));
+  $('rule').replaceChildren(el('b', {}, 'The rule. '), s.rules.text, ' ', el('span', {style: 'color:var(--text-muted)'}, fairShown(s) ? "Each one sees the teams, the prices and Predictefy's fair price." : 'Each one sees the teams and the prices, nothing else.'));
   const start = Date.parse(s.startAt);
   const live = s.status === 'running' && s.stage === 'trading' && now >= start;
   $('pill').className = `pill ${live ? 'live' : (s.status === 'finished' || s.stage !== 'trading' ? 'done' : '')}`;
@@ -438,9 +452,9 @@ async function renderRound() {
         : el('span', {class: 'bet miss'}, `${bet.side}: ${bet.status.replace(/-/g, ' ')}`);
       const odds = a?.pYes === null || a?.pYes === undefined ? null : pct(a.pYes);
       const reason = c.baseline ? '' : c.kind === 'jev' ? (odds ? `own odds for YES: ${odds}. Jev gives odds, not reasons.` : '') : `${odds ? `Says ${odds} YES. ` : ''}${a?.reason || ''}`;
-      return el('div', {class: 'call'}, el('span', {class: 'dot', style: `--series:${colorOf(c)}`}), el('span', {class: 'nm'}, short(c.label)), el('span', {class: 'wanted'}, c.baseline ? 'random' : (a?.call || '').replace('_', ' ')), el('span', {class: 'why'}, badge, reason, bet?.why ? ` ${bet.why}` : ''));
+      return el('div', {class: 'call', 'data-who': c.name}, el('span', {class: 'dot', style: `--series:${colorOf(c)}`}), el('span', {class: 'nm'}, short(c.label)), el('span', {class: 'wanted'}, c.baseline ? 'random' : (a?.call || '').replace('_', ' ')), el('span', {class: 'why'}, badge, reason, bet?.why ? ` ${bet.why}` : ''));
     });
-    const fair = g.yes.fair !== null && g.no.fair !== null ? el('span', {class: 'hidden-fact'}, ` · Predictefy fair ${pct(g.yes.fair)} / ${pct(g.no.fair)}, hidden from the AIs`) : null;
+    const fair = g.yes.fair !== null && g.no.fair !== null ? el('span', {class: 'hidden-fact'}, ` · Predictefy fair ${pct(g.yes.fair)} / ${pct(g.no.fair)}, ${fairShown(s) ? 'shown to the AIs' : 'hidden from the AIs'}`) : null;
     return el('div', {class: 'game', 'data-game': g.gid}, el('h4', {}, g.title), el('div', {class: 'meta'}, `${when} · YES ${g.yes.name} ${price(g.yes)} · NO ${g.no.name} ${price(g.no)}`, fair), ...calls);
   });
   host.replaceChildren(head,
@@ -481,8 +495,7 @@ function renderRules() {
   host.replaceChildren(
     el('h3', {}, 'The rule'), el('p', {}, s.rules.text),
     el('p', {}, 'Every contestant gets the same list of games and the same question for each: ', el('b', {}, 'buy YES, buy NO or skip'), ', its own probability, the side it leans to and how strongly. The harness then puts ', el('b', {}, `$${s.rules.stakeUsd}`), ` on each contestant's ${s.rules.betsPerRound.max} strongest picks, at whichever venue is cheaper after fees. A bet is the full stake or nothing: with less than $${s.rules.stakeUsd} free, a contestant sits that bet out.`),
-    el('h3', {}, 'Why the bets are forced, and why the fair price is hidden'),
-    el('p', {}, "In a first test every AI could see Predictefy's no-vig fair price and could skip. All three skipped every game, because the prices sat on the fair price. So each AI now has to place its two best bets a round, and the fair price is kept for scoring instead. What each one would have done by choice is still recorded: it is the \"would have skipped\" line on its card."),
+    ...whySection(s),
     el('p', {}, el('b', {}, 'Random picks'), ' is not an AI. It bets two random sides a round from the same games at the same stake, from a saved seed. An AI that cannot beat it has not shown skill.'),
     el('h3', {}, 'Why games, and no crypto'),
     el('p', {}, "On 8 October 2026 Predictefy's paper engine had no live order book for any short-dated crypto market: 30 were tested on both sides, 27 on Polymarket and 3 on Kalshi, and none took an order. It does hold a live book for every outcome the sports screen shows as a live, fresh quote, so this run trades games."),
