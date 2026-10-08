@@ -59,7 +59,7 @@ export function likeForLike(state, rounds) {
     const answers = Object.fromEntries(everyone.map(c => [c.name, classifyAnswer(r.answers?.[c.name], {note: note.startsWith(`${c.name}:`) ? note : ''})]));
     played.push({round: r.round, games: r.slate.length, answers, allAnswered: ais.every(name => answers[name].kind === 'answered')});
   }
-  const fair = new Set(played.filter(p => p.allAnswered).map(p => p.round));
+  const fair = new Set(played.filter(p => p.allAnswered).map(p => p.round)), done = new Set(played.map(p => p.round));
   const notAnswered = played.flatMap(p => everyone.filter(c => p.answers[c.name].kind !== 'answered').map(c => ({round: p.round, name: c.name, label: c.label, ...p.answers[c.name]})));
   const latency = name => {
     const times = rounds.map(r => r.answers?.[name]).filter(a => a?.status === 'ok' && typeof a.latencyMs === 'number').map(a => a.latencyMs);
@@ -68,14 +68,15 @@ export function likeForLike(state, rounds) {
   const contestants = everyone.map(c => {
     const kinds = {answered: 0, late: 0, invalid: 0, unavailable: 0, failed: 0};
     for (const p of played) kinds[p.answers[c.name].kind]++;
-    const positions = c.account.positions, all = tally(positions);
+    // Bets of a round still being played are left out of both columns until the round has finished.
+    const positions = c.account.positions, everything = tally(positions), all = tally(positions.filter(p => done.has(p.round)));
     return {
       name: c.name, label: c.label, baseline: Boolean(c.baseline), rounds: kinds,
       unavailableRounds: played.filter(p => p.answers[c.name].kind === 'unavailable').map(p => p.round),
       averageSecondsWhenAnswered: latency(c.name),
-      all, likeForLike: tally(positions.filter(p => fair.has(p.round))),
+      all, likeForLike: tally(positions.filter(p => fair.has(p.round))), betsNotCounted: everything.bets - all.bets,
       // the bets add up to the balance: profit over every bet equals balance minus starting cash
-      balanceCheck: cents(all.pnl - (c.account.cash + positions.filter(p => p.state === 'open').reduce((sum, p) => sum + p.shares * (p.mark ?? p.avgPrice), 0) - c.account.startingCash)),
+      balanceCheck: cents(everything.pnl - (c.account.cash + positions.filter(p => p.state === 'open').reduce((sum, p) => sum + p.shares * (p.mark ?? p.avgPrice), 0) - c.account.startingCash)),
     };
   });
   // How often two AIs ended a round with exactly the same bets: the same games on the same sides.
@@ -120,6 +121,8 @@ export function comparisonLines(result) {
     `           every AI (${result.ais.join(', ')}) answered in ${result.roundsAllAnswered} of ${result.roundsPlayed}`,
   ];
   if (!result.notAnswered.length) lines.push('           no contestant missed a round, so both comparisons below are the same');
+  const waiting = result.contestants.reduce((sum, c) => sum + (c.betsNotCounted || 0), 0);
+  if (waiting) lines.push(`           ${waiting} bet${waiting === 1 ? '' : 's'} of ${result.roundsInProgress ? 'the round in progress' : 'rounds with no saved record'} ${waiting === 1 ? 'is' : 'are'} not counted below`);
   for (const miss of result.notAnswered) lines.push(`  round ${String(miss.round).padStart(2)}  ${miss.name.padEnd(8)} ${miss.kind}${miss.cause ? ` (${miss.cause})` : ''}: ${miss.text}`);
   lines.push('', `${''.padEnd(10)} ${'every round'.padEnd(34)} ${`rounds where every AI answered (${result.roundsAllAnswered})`}`);
   for (const c of result.contestants) {

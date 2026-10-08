@@ -60,7 +60,7 @@ const state = {
     claude: {name: 'claude', label: 'Claude', account: account([bet(1, 'won', 4, {pnl: 6}), bet(2, 'lost', 5, {pnl: -5}), bet(4, 'open', 5, {mark: 0.6})])},
     gpt6: {name: 'gpt6', label: 'GPT', account: account([bet(1, 'lost', 5, {pnl: -5}), bet(2, 'won', 5, {pnl: 5}), bet(3, 'won', 2, {pnl: 8}), bet(4, 'open', 5, {mark: 0.4})])},
     jev: {name: 'jev', label: 'Jev', account: account([bet(1, 'won', 5, {pnl: 5}), bet(3, 'lost', 5, {pnl: -5}), bet(4, 'open', 5)])},
-    random: {name: 'random', label: 'Random picks', baseline: true, account: account([bet(1, 'lost', 5, {pnl: -5}), bet(2, 'lost', 5, {pnl: -5}), bet(3, 'won', 5, {pnl: 5}), bet(4, 'open', 5, {mark: 0.5})])},
+    random: {name: 'random', label: 'Random picks', baseline: true, account: account([bet(1, 'lost', 5, {pnl: -5}), bet(2, 'lost', 5, {pnl: -5}), bet(3, 'won', 5, {pnl: 5}), bet(4, 'open', 5, {mark: 0.5}), bet(7, 'open', 5, {mark: 0.9})])},
   },
 };
 const ok = ms => ({status: 'ok', latencyMs: ms});
@@ -93,6 +93,7 @@ test('the comparison is given over every round and over only the rounds in which
   assert.deepEqual([by.claude.likeForLike.pnl, by.gpt6.likeForLike.pnl, by.jev.likeForLike.pnl, by.random.likeForLike.pnl], [7, -6, 5, -5]);
   assert.deepEqual([by.gpt6.all.bets, by.gpt6.likeForLike.bets], [4, 2]);
   assert.equal(by.random.baseline, true, 'the random picker is listed but never decides which rounds count');
+  assert.deepEqual([by.random.all.bets, by.random.betsNotCounted], [4, 1], 'a bet of the round still being played waits until that round has finished');
   for (const c of result.contestants) assert.equal(c.balanceCheck, 0, `${c.name}: profit over every bet equals balance minus starting cash`);
   assert.equal(by.claude.averageSecondsWhenAnswered, 7, 'a call that failed in a second does not make Claude look faster');
   assert.equal(by.jev.averageSecondsWhenAnswered, 0.3, 'a late round does not count as a 153-second answer');
@@ -153,6 +154,7 @@ test('the terminal report names each round a contestant sat out and why', () => 
   assert.match(text, /round {2}2 {2}jev {6}late: no answer within 150 s/);
   assert.match(text, /claude .*sat out: 1 unavailable/);
   assert.match(text, /check: for every contestant/);
+  assert.match(text, /1 bet of the round in progress is not counted below/);
   const clean = comparisonLines(likeForLike(state, rounds.filter(r => r.round === 1 || r.round === 4))).join('\n');
   assert.match(clean, /no contestant missed a round/);
 });

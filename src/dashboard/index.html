@@ -277,14 +277,15 @@ function whySection(s) {
 function likeSection() {
   const cs = Object.values(ui.view.state.contestants), ais = cs.filter(c => !c.baseline);
   const played = [...ui.played.entries()].filter(([, r]) => r.finished && r.games);
-  const fair = new Set(played.filter(([, r]) => ais.every(c => r.answers[c.name]?.kind === 'answered')).map(([n]) => n));
+  const fair = new Set(played.filter(([, r]) => ais.every(c => r.answers[c.name]?.kind === 'answered')).map(([n]) => n)), done = new Set(played.map(([n]) => n));
   const all = COUNT_WORDS[ais.length] || ais.length;
   const sum = ps => [`${ps.length} bets`, signed(ps.reduce((t, p) => t + betValue(p), 0))];
   const rows = cs.map(c => {
     const out = {};
     for (const [, r] of played) { const a = r.answers[c.name]; if (a && a.kind !== 'answered') { const k = a.cause ? `unavailable (${a.cause})` : a.kind; out[k] = (out[k] || 0) + 1; } }
     const sat = Object.entries(out).map(([k, n]) => `${n} ${k}`).join(', ');
-    const everyRound = sum(c.account.positions), fairRounds = sum(c.account.positions.filter(p => fair.has(p.round)));
+    // bets of a round still being played are left out of both pairs of columns until the round has finished
+    const everyRound = sum(c.account.positions.filter(p => done.has(p.round))), fairRounds = sum(c.account.positions.filter(p => fair.has(p.round)));
     return el('tr', {'data-like': c.name},
       el('td', {}, el('span', {class: 'state'}, el('span', {class: 'dot', style: `--series:${colorOf(c)}`}), short(c.label))),
       el('td', {class: 'num'}, everyRound[0]), el('td', {class: 'num'}, el('span', {class: 't'}, everyRound[1])),
