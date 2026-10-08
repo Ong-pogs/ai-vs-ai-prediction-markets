@@ -1,0 +1,7 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>AI vs AI</title></head>
+<body><pre id="out">loading</pre>
+<script>
+async function tick() { const r = await fetch('/api/state'); const v = await r.json(); document.getElementById('out').textContent = JSON.stringify({run: v.state.runId, status: v.state.status, round: v.state.roundsDone + ' of ' + v.state.rounds, equity: v.state.equity.at(-1)}, null, 2); }
+tick(); setInterval(tick, 10000);
+</script></body></html>

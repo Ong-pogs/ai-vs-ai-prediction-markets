@@ -1,0 +1,25 @@
+{
+  "name": "games-24h",
+  "title": "3 AIs, $100 each, 24 hours of games on Polymarket and Kalshi",
+  "startingCash": 100,
+  "stakeUsd": 5,
+  "betsPerRound": {"min": 2, "max": 2},
+  "intervalMinutes": 30,
+  "durationHours": 24,
+  "answerDeadlineSec": 150,
+  "maxMarketsPerRound": 8,
+  "minMarketsPerRound": 4,
+  "settleGraceHours": 3,
+  "dashboardPort": 8815,
+  "facts": {"fairPrice": false},
+  "execution": {"mode": "predictefy-paper", "slippage": 0.02, "fillWaitSec": 90, "pollEverySec": 2},
+  "markets": [
+    {"kind": "sports-screen", "marketType": "moneyline", "venues": ["polymarket", "kalshi"], "kickoffFromHours": -3, "kickoffToHours": 1.5, "minSizeAtPrice": 100, "priceMin": 0.05, "priceMax": 0.95, "maxPerSport": 3, "maxQuoteAgeSec": 60}
+  ],
+  "contestants": [
+    {"name": "claude", "label": "Claude Opus 5.5", "kind": "claude-cli", "model": "opus", "effort": "medium", "color": "#d95926"},
+    {"name": "gpt6", "label": "GPT-6.1 Sol", "kind": "codex-cli", "model": "gpt-6.1-sol", "effort": "medium", "color": "#199e70"},
+    {"name": "jev", "label": "Jev 1.13", "kind": "jev", "model": "jev-1.13.0", "color": "#3987e5"},
+    {"name": "random", "label": "Random picks", "kind": "random", "baseline": true, "seed": 20261008, "color": "#8f8e88"}
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  "name": "ai-vs-ai-prediction-markets",
+  "version": "1.0.0",
+  "description": "Give several AIs the same Predictefy data and the same paper budget, and see which one bets best on Polymarket and Kalshi.",
+  "type": "module",
+  "private": true,
+  "license": "MIT",
+  "engines": { "node": ">=22.12" },
+  "scripts": {
+    "start": "node src/cli.mjs start",
+    "launch": "node src/cli.mjs launch",
+    "status": "node src/cli.mjs status",
+    "stop": "node src/cli.mjs stop",
+    "settle": "node src/cli.mjs settle",
+    "check": "node src/cli.mjs check",
+    "dashboard": "node src/cli.mjs dashboard",
+    "test": "node --test \"test/*.test.mjs\""
+  }
+}

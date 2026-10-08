@@ -1,0 +1,15 @@
+{
+  "name": "smoke-random",
+  "title": "Smoke test: the random picker alone, one round",
+  "intervalMinutes": 2,
+  "durationHours": 0.0333,
+  "answerDeadlineSec": 30,
+  "settleGraceHours": 0,
+  "facts": {"fairPrice": false},
+  "markets": [
+    {"kind": "sports-screen", "marketType": "moneyline", "venues": ["polymarket", "kalshi"], "kickoffFromHours": -3, "kickoffToHours": 1.5, "maxQuoteAgeSec": 60}
+  ],
+  "contestants": [
+    {"name": "random", "label": "Random picks", "kind": "random", "baseline": true, "seed": 7, "color": "#8f8e88"}
+  ]
+}
