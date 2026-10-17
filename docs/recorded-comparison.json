@@ -1,0 +1,243 @@
+{
+  "writtenAt": "2026-10-17T18:09:18.460Z",
+  "runId": "games-24h-20261008-0930z",
+  "ais": [
+    "claude",
+    "gpt6",
+    "jev"
+  ],
+  "roundsPlanned": 48,
+  "roundsMissed": 0,
+  "roundsInProgress": 0,
+  "roundsWithoutGames": 0,
+  "roundsPlayed": 48,
+  "roundsAllAnswered": 48,
+  "likeForLikeRounds": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19,
+    20,
+    21,
+    22,
+    23,
+    24,
+    25,
+    26,
+    27,
+    28,
+    29,
+    30,
+    31,
+    32,
+    33,
+    34,
+    35,
+    36,
+    37,
+    38,
+    39,
+    40,
+    41,
+    42,
+    43,
+    44,
+    45,
+    46,
+    47,
+    48
+  ],
+  "notAnswered": [],
+  "contestants": [
+    {
+      "name": "claude",
+      "label": "Claude Opus 5.5",
+      "baseline": false,
+      "rounds": {
+        "answered": 48,
+        "late": 0,
+        "invalid": 0,
+        "unavailable": 0,
+        "failed": 0
+      },
+      "unavailableRounds": [],
+      "averageSecondsWhenAnswered": 8.16,
+      "all": {
+        "bets": 57,
+        "won": 21,
+        "lost": 16,
+        "open": 20,
+        "staked": 271.46,
+        "pnl": 0.65
+      },
+      "likeForLike": {
+        "bets": 57,
+        "won": 21,
+        "lost": 16,
+        "open": 20,
+        "staked": 271.46,
+        "pnl": 0.65
+      },
+      "betsNotCounted": 0,
+      "balanceCheck": 0
+    },
+    {
+      "name": "gpt6",
+      "label": "GPT-6.1 Sol",
+      "baseline": false,
+      "rounds": {
+        "answered": 48,
+        "late": 0,
+        "invalid": 0,
+        "unavailable": 0,
+        "failed": 0
+      },
+      "unavailableRounds": [],
+      "averageSecondsWhenAnswered": 23.45,
+      "all": {
+        "bets": 48,
+        "won": 15,
+        "lost": 19,
+        "open": 14,
+        "staked": 234.87,
+        "pnl": -35.27
+      },
+      "likeForLike": {
+        "bets": 48,
+        "won": 15,
+        "lost": 19,
+        "open": 14,
+        "staked": 234.87,
+        "pnl": -35.27
+      },
+      "betsNotCounted": 0,
+      "balanceCheck": 0
+    },
+    {
+      "name": "jev",
+      "label": "Jev 1.13",
+      "baseline": false,
+      "rounds": {
+        "answered": 48,
+        "late": 0,
+        "invalid": 0,
+        "unavailable": 0,
+        "failed": 0
+      },
+      "unavailableRounds": [],
+      "averageSecondsWhenAnswered": 0.56,
+      "all": {
+        "bets": 49,
+        "won": 15,
+        "lost": 16,
+        "open": 18,
+        "staked": 236.37,
+        "pnl": -0.21
+      },
+      "likeForLike": {
+        "bets": 49,
+        "won": 15,
+        "lost": 16,
+        "open": 18,
+        "staked": 236.37,
+        "pnl": -0.21
+      },
+      "betsNotCounted": 0,
+      "balanceCheck": 0
+    },
+    {
+      "name": "random",
+      "label": "Random picks",
+      "baseline": true,
+      "rounds": {
+        "answered": 48,
+        "late": 0,
+        "invalid": 0,
+        "unavailable": 0,
+        "failed": 0
+      },
+      "unavailableRounds": [],
+      "averageSecondsWhenAnswered": 0,
+      "all": {
+        "bets": 61,
+        "won": 23,
+        "lost": 16,
+        "open": 22,
+        "staked": 291.41,
+        "pnl": 48.13
+      },
+      "likeForLike": {
+        "bets": 61,
+        "won": 23,
+        "lost": 16,
+        "open": 22,
+        "staked": 291.41,
+        "pnl": 48.13
+      },
+      "betsNotCounted": 0,
+      "balanceCheck": 0
+    }
+  ],
+  "sameBets": [
+    {
+      "a": "claude",
+      "b": "gpt6",
+      "roundsBothBet": 24,
+      "rounds": [
+        1,
+        21,
+        29,
+        31,
+        37,
+        48
+      ]
+    },
+    {
+      "a": "claude",
+      "b": "jev",
+      "roundsBothBet": 22,
+      "rounds": []
+    },
+    {
+      "a": "gpt6",
+      "b": "jev",
+      "roundsBothBet": 21,
+      "rounds": []
+    }
+  ],
+  "betsByVenue": {
+    "polymarket": 206,
+    "kalshi": 9
+  },
+  "gamesOffered": 228,
+  "gamesWithPriceOn": {
+    "polymarket": 221,
+    "kalshi": 27
+  },
+  "models": {
+    "claude": {
+      "claude-opus-5-5": 48
+    },
+    "gpt6": {
+      "gpt-6.1-sol": 48
+    },
+    "jev": {
+      "jev-1.13.0": 48
+    }
+  }
+}

@@ -1,12 +1,39 @@
-# AI vs AI on Prediction Markets
+# Claude vs GPT-6.1 vs Jev: 24 Hours on Prediction Markets
 
 Give several AIs the same data and the same $100 of paper money, and see which one bets best on Polymarket and Kalshi.
 
-Every round the harness takes a list of games from the [Predictefy API](https://predictefy.com/api), asks every contestant the same question about each game, turns the answers into bets by one fixed rule, and places them as paper orders that fill against the real order books. It runs on your own computer and opens a local dashboard. It never places a real order and never asks for a venue key or a wallet.
+**Built on [Predictefy](https://predictefy.com/en)**, the prediction market API used here for sports prices, order-book execution and settlement reads across Polymarket and Kalshi. See the [Prediction Market API](https://predictefy.com/en/api?utm_source=github&utm_medium=repo&utm_campaign=claude-vs-gpt61-vs-jev&utm_content=readme-top), [documentation](https://docs.predictefy.com/), [quickstart](https://docs.predictefy.com/quickstart/) and [pricing](https://predictefy.com/en/pricing).
+
+- **Same facts and rules:** Claude Opus 5.5, GPT-6.1 Sol and Jev 1.13 receive the same sports slate, with a seeded random picker alongside them.
+- **A fixed comparison:** $100 per contestant, $5 stakes, up to two bets every 30 minutes for 24 hours. Cash tied up in open bets can reduce the number placed.
+- **Local and reproducible:** no npm dependencies; saved prompts, answers, orders and settlement reads; a dashboard on your computer.
+- **Execution is simulated:** fills use live books through Predictefy. No real orders, wallet or venue credentials.
+
+Every round the harness takes a list of games from the [Predictefy API](https://predictefy.com/en/api?utm_source=github&utm_medium=repo&utm_campaign=claude-vs-gpt61-vs-jev&utm_content=readme), asks every contestant the same question about each game, turns the answers into bets by one fixed rule, and places them as paper orders that fill against the real order books. It runs on your own computer and opens a local dashboard. It never places a real order and never asks for a venue key or a wallet.
 
 ![The dashboard](docs/dashboard.png)
 
 > Paper results are not real results. The paper engine fills against the real order book, but it does not model queue position, market impact or delay.
+
+## The recorded run (October 8-9, 2026)
+
+All three AIs answered all 48 rounds, with no late, invalid, unavailable or failed answers. The scoreboard below is the snapshot after the three-hour settlement grace period, **including open bets valued at their last recorded prices**.
+
+| Contestant | Marked balance | Bets | Won | Lost | Open |
+|---|---:|---:|---:|---:|---:|
+| Claude Opus 5.5 | $100.65 | 57 | 21 | 16 | 20 |
+| Jev 1.13 | $99.79 | 49 | 15 | 16 | 18 |
+| GPT-6.1 Sol | $64.73 | 48 | 15 | 19 | 14 |
+| Random picks | $148.13 | 61 | 23 | 16 | 22 |
+
+These are provisional marked balances, not final settled profits. There were **74 open bets** across the accounts, and some recorded prices may be stale. Random led on this snapshot; a single day with forced bets and repeated exposure to games does not establish trading skill.
+
+- **Venues:** 206 fills on Polymarket, 9 on Kalshi.
+- **Predictefy usage:** 3,005 credits: 240 for the sports screen and 2,765 for market reads. Paper-order calls cost 0 credits.
+- **Model usage:** Claude reported $1.1334 at API list-price equivalent, rather than a separate subscription charge. Jev reported $0.0058. Codex reported 1,029,400 tokens without a dollar cost; total model spending cannot be compared on the same basis.
+- **Prompt change:** all three skipped the initial test games when skipping was allowed and the fair-price reference was visible. The recorded run hides that reference and requires the strongest two picks when funds and fills permit.
+
+The [recorded comparison summary](docs/recorded-comparison.json) contains aggregate results from the saved run. Private raw run folders and credentials are excluded. You can reproduce the harness and run a new comparison; current prices, model aliases and outcomes will differ.
 
 ## What a round does
 
@@ -134,6 +161,30 @@ npm test
 ```
 
 The tests use saved Predictefy responses, a stand-in paper engine and stand-in command lines. They make no network calls and place no orders.
+
+## Learn more on Predictefy
+
+**Product**
+- [Predictefy](https://predictefy.com/en): prediction market terminal and API
+- [Prediction Market API](https://predictefy.com/en/api?utm_source=github&utm_medium=repo&utm_campaign=claude-vs-gpt61-vs-jev&utm_content=readme-links): the API powering this comparison
+- [Markets](https://predictefy.com/en/markets) and [analytics](https://predictefy.com/en/analytics): explore the markets behind the data
+- [Pricing and plans](https://predictefy.com/en/pricing) and [get an API key](https://portal.predictefy.com/keys)
+
+**Docs used by this experiment**
+- [Documentation](https://docs.predictefy.com/), [quickstart](https://docs.predictefy.com/quickstart/) and [credits](https://docs.predictefy.com/guides/credits/)
+- [Sports data guide](https://docs.predictefy.com/guides/sports/): the shared sports slate and venue prices
+- [Paper trading guide](https://docs.predictefy.com/guides/paper-trading/): order submission and simulated execution
+
+**AI models and prediction market bots**
+- [How to use an LLM to analyze prediction markets](https://blog.predictefy.com/how-to-use-an-llm-to-analyze-prediction-markets)
+- [How to build a prediction market bot with Claude](https://blog.predictefy.com/prediction-market-trading-bot-claude)
+- [How to build a Polymarket trading bot in Python](https://blog.predictefy.com/polymarket-trading-bot)
+- [Polymarket paper trading: how to practice for free](https://blog.predictefy.com/polymarket-paper-trading)
+- [Kalshi API vs Polymarket API](https://blog.predictefy.com/kalshi-api-vs-polymarket-api)
+
+**Related experiment:** [DeepSeek vs Kimi vs MiniMax Bitcoin arena](https://github.com/Ong-pogs/deepseek-vs-kimi-vs-minimax-bitcoin-arena).
+
+**Community:** [Predictefy Discord](https://discord.gg/KVrWkhD8S) and [Predictefy blog](https://blog.predictefy.com).
 
 ## License
 
