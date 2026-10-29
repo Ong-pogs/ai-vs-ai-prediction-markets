@@ -2,7 +2,7 @@
 // Docs: https://docs.predictefy.com . Paper trading (/v1/paper/*) costs 0 credits and fills against real order books.
 import {sleep} from './util.mjs';
 
-export const UPGRADE_URL = 'https://predictefy.com/en/api?utm_source=youtube&utm_medium=video&utm_campaign=ai-vs-ai-paper-trading&utm_content=app';
+export const UPGRADE_URL = 'https://predictefy.com/en/prediction-market-api?utm_source=youtube&utm_medium=video&utm_campaign=ai-vs-ai-paper-trading&utm_content=app';
 
 export function makePredictefy({apiKey, base = 'https://data.predictefy.com', fetchImpl = fetch, timeoutMs = 20000, pause = sleep}) {
   const usage = {calls: 0, credits: 0, byEndpoint: {}, planNotice: null};
