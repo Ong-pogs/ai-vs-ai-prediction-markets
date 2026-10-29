@@ -2,14 +2,14 @@
 
 Give several AIs the same data and the same $100 of paper money, and see which one bets best on Polymarket and Kalshi.
 
-**Built on [Predictefy](https://predictefy.com/en)**, the prediction market API used here for sports prices, order-book execution and settlement reads across Polymarket and Kalshi. See the [Prediction Market API](https://predictefy.com/en/api?utm_source=github&utm_medium=repo&utm_campaign=claude-vs-gpt61-vs-jev&utm_content=readme-top), [documentation](https://docs.predictefy.com/), [quickstart](https://docs.predictefy.com/quickstart/) and [pricing](https://predictefy.com/en/pricing).
+**Built on [Predictefy](https://predictefy.com/en)**, the prediction market API used here for sports prices, order-book execution and settlement reads across Polymarket and Kalshi. See the [Prediction Market API](https://predictefy.com/en/prediction-market-api?utm_source=github&utm_medium=repo&utm_campaign=claude-vs-gpt61-vs-jev&utm_content=readme-top), [documentation](https://docs.predictefy.com/), [quickstart](https://docs.predictefy.com/quickstart/) and [pricing](https://predictefy.com/en/pricing).
 
 - **Same facts and rules:** Claude Opus 5.5, GPT-6.1 Sol and Jev 1.13 receive the same sports slate, with a seeded random picker alongside them.
 - **A fixed comparison:** $100 per contestant, $5 stakes, up to two bets every 30 minutes for 24 hours. Cash tied up in open bets can reduce the number placed.
 - **Local and reproducible:** no npm dependencies; saved prompts, answers, orders and settlement reads; a dashboard on your computer.
 - **Execution is simulated:** fills use live books through Predictefy. No real orders, wallet or venue credentials.
 
-Every round the harness takes a list of games from the [Predictefy API](https://predictefy.com/en/api?utm_source=github&utm_medium=repo&utm_campaign=claude-vs-gpt61-vs-jev&utm_content=readme), asks every contestant the same question about each game, turns the answers into bets by one fixed rule, and places them as paper orders that fill against the real order books. It runs on your own computer and opens a local dashboard. It never places a real order and never asks for a venue key or a wallet.
+Every round the harness takes a list of games from the [Predictefy API](https://predictefy.com/en/prediction-market-api?utm_source=github&utm_medium=repo&utm_campaign=claude-vs-gpt61-vs-jev&utm_content=readme), asks every contestant the same question about each game, turns the answers into bets by one fixed rule, and places them as paper orders that fill against the real order books. It runs on your own computer and opens a local dashboard. It never places a real order and never asks for a venue key or a wallet.
 
 ![The dashboard](docs/dashboard.png)
 
@@ -166,7 +166,7 @@ The tests use saved Predictefy responses, a stand-in paper engine and stand-in c
 
 **Product**
 - [Predictefy](https://predictefy.com/en): prediction market terminal and API
-- [Prediction Market API](https://predictefy.com/en/api?utm_source=github&utm_medium=repo&utm_campaign=claude-vs-gpt61-vs-jev&utm_content=readme-links): the API powering this comparison
+- [Prediction Market API](https://predictefy.com/en/prediction-market-api?utm_source=github&utm_medium=repo&utm_campaign=claude-vs-gpt61-vs-jev&utm_content=readme-links): the API powering this comparison
 - [Markets](https://predictefy.com/en/markets) and [analytics](https://predictefy.com/en/analytics): explore the markets behind the data
 - [Pricing and plans](https://predictefy.com/en/pricing) and [get an API key](https://portal.predictefy.com/keys)
 
